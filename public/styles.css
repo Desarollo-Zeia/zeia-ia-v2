@@ -73,6 +73,38 @@ body {
   margin-top: 2px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mode-badge {
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  letter-spacing: .12em;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.admin-btn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  transition: border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.admin-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ---------- Dashboard area ---------- */
 
 .dashboard {

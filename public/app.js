@@ -85,6 +85,7 @@ function renderMeta(dashboard) {
 function renderDashboard(dashboard) {
   clearDashboard();
   renderMeta(dashboard);
+  setMode("ANÁLISIS DE CONSULTA", "#4cc3ff");
   if (!dashboard) return;
   const grid = document.getElementById("cards");
   grid.className = "grid";
@@ -521,14 +522,48 @@ const SEVERITY_META = {
   info: { label: "INFO", color: "#4cc3ff" },
 };
 
+function setMode(label, color) {
+  const badge = document.getElementById("mode-badge");
+  if (!badge) return;
+  badge.textContent = label;
+  badge.style.color = color;
+  badge.style.borderColor = color;
+}
+
 async function loadFindings() {
+  const grid = document.getElementById("cards");
+  const empty = document.getElementById("empty-state");
+  const meta = document.getElementById("dash-meta");
+  setMode("CARGANDO PANEL", "#8a99ab");
   try {
     const res = await fetch("/findings");
-    if (!res.ok) return;
+    if (!res.ok) {
+      const detail = res.status === 404
+        ? "El servidor no tiene el endpoint /findings. Reinicia el server (bun run server) para cargar la version actual."
+        : `El server respondio ${res.status} al pedir el panel.`;
+      clearDashboard();
+      empty.hidden = true;
+      meta.innerHTML = "";
+      meta.appendChild(el("h2", null, "Modo Administrador"));
+      meta.appendChild(el("p", null, "No disponible"));
+      const errCard = el("section", "card finding finding--critical");
+      errCard.appendChild(el("h3", "finding-title", "Panel del administrador no disponible"));
+      errCard.appendChild(el("p", "finding-detail", detail));
+      errCard.appendChild(el("p", "finding-detail", "Mientras tanto puedes preguntarle a ZeIA en el chat de abajo."));
+      grid.appendChild(errCard);
+      setMode("SIN PANEL", "#ff6b6b");
+      return;
+    }
     const data = await res.json();
     if (data && data.findings) renderFindingsPanel(data);
-  } catch {
-    /* sin panel: el dashboard queda con el estado vacio normal */
+  } catch (err) {
+    clearDashboard();
+    empty.hidden = true;
+    const errCard = el("section", "card finding finding--critical");
+    errCard.appendChild(el("h3", "finding-title", "No pude contactar al servidor"));
+    errCard.appendChild(el("p", "finding-detail", String(err)));
+    grid.appendChild(errCard);
+    setMode("SIN CONEXION", "#ff6b6b");
   }
 }
 
@@ -536,6 +571,7 @@ function renderFindingsPanel(a) {
   clearDashboard();
   const grid = document.getElementById("cards");
   grid.className = "grid";
+  setMode("MODO ADMINISTRADOR", "#35e0c8");
   const meta = document.getElementById("dash-meta");
   meta.innerHTML = "";
   meta.appendChild(el("h2", null, "Modo Administrador"));
@@ -656,5 +692,7 @@ document.getElementById("chat-form").addEventListener("submit", (e) => {
 document.querySelectorAll(".suggestions .chip").forEach((chip) => {
   chip.addEventListener("click", () => send(chip.textContent));
 });
+
+document.getElementById("admin-btn").addEventListener("click", () => loadFindings());
 
 loadFindings();
