@@ -5,7 +5,8 @@ const PALETTE = [
 
 const SPAN_RULES = {
   kpi: { base: 3, max: 6 },
-  context: { base: 3, max: 6 },
+  context: { base: 12, max: 12 },
+  "context-strip": { base: 12, max: 12 },
   share: { base: 4, max: 6 },
   ranking: { base: 6, max: 12 },
   trend: { base: 6, max: 12 },
@@ -78,11 +79,17 @@ function renderDashboard(dashboard) {
   grid.className = "grid";
 
   const expanded = [];
+  let heroUsed = false;
   for (const card of dashboard.cards) {
     if (card.type === "context") {
-      for (const item of card.items) {
-        expanded.push({ ...card, title: item.label, value: item.value });
-      }
+      expanded.push({
+        type: "context-strip",
+        title: card.title,
+        items: card.items,
+      });
+    } else if (card.type === "kpi" && !heroUsed) {
+      heroUsed = true;
+      expanded.push({ ...card, hero: true });
     } else {
       expanded.push(card);
     }
@@ -156,6 +163,7 @@ function packRows(cards) {
 
 function buildCard(card) {
   const node = el("section", `card card--${card.type}`);
+  if (card.hero) node.classList.add("card--hero");
   switch (card.type) {
     case "kpi": return buildKpi(node, card);
     case "share": return buildShare(node, card);
@@ -163,6 +171,7 @@ function buildCard(card) {
     case "trend": return buildTrend(node, card);
     case "table": return buildTable(node, card);
     case "context": return buildContext(node, card);
+    case "context-strip": return buildContextStrip(node, card);
     case "structure": return buildStructure(node, card);
     case "insights": return buildInsights(node, card);
     default: return null;
@@ -387,6 +396,19 @@ function buildTable(node, card) {
 function buildContext(node, card) {
   node.appendChild(el("h3", null, card.title));
   node.appendChild(el("div", "context-value", fmtDateTime(card.value)));
+  return node;
+}
+
+function buildContextStrip(node, card) {
+  node.classList.add("card--context");
+  const wrap = el("div", "context-strip");
+  for (const item of card.items) {
+    const chip = el("div", "context-chip");
+    chip.appendChild(el("span", "context-label", item.label));
+    chip.appendChild(el("span", "context-value-sm", fmtDateTime(item.value)));
+    wrap.appendChild(chip);
+  }
+  node.appendChild(wrap);
   return node;
 }
 

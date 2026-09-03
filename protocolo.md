@@ -23,7 +23,7 @@ Cómo ZeIA convierte una pregunta del cliente en un dashboard. Catálogo **cerra
 | `ranking` | Comparación ordenada entre puntos (barras horizontales). Responde "¿quién consume más?" | ≤ 8 items |
 | `trend` | Evolución temporal (línea). Responde "¿cómo fue a lo largo de...?" | ≤ 60 puntos |
 | `table` | Detalle multi-atributo (punto, tablero, sede, valor). | ≤ 6 columnas, ≤ 12 filas |
-| `context` | Dato del sujeto: cada chip se renderiza como **card independiente** (base 3, acento teal). Van primero. Última lectura, sede, tablero, etc. | ≤ 6 chips |
+| `context` | Datos del sujeto (sede, moneda, última lectura, periodo): se renderizan como **un strip compacto de una línea** al final, antes de `insights`. Son información adicional, no protagonistas. | ≤ 6 chips |
 | `structure` | Jerarquía tablero → puntos de monitoreo: cada tablero con su badge de conteo ("9 puntos de monitoreo activos") y sus puntos como chips. | ≤ 8 tableros, ≤ 12 puntos c/u |
 | `insights` | Apartado de **análisis del asistente**: frases con lo que el cliente debe tomar en cuenta (anomalías, comparaciones, advertencias de datos, recomendaciones). Ancho completo, va al final. | ≤ 6 frases |
 
@@ -43,13 +43,13 @@ Todas las cards aceptan `group` (opcional): cards con el mismo `group` se agrupa
 - Nada de donuts con más de 8 categorías: agrupar en "Otros" o usar `table`.
 - **Máximo DOS gráficos** (trend/ranking/share) por dashboard, el resto son de apoyo (kpi/context/table).
 
-**Orden de lectura en pantalla (fijo):** `context` → `kpi` → gráfico principal (ancho doble) → `table` → `insights`.
+**Orden de lectura en pantalla (por prioridad, el server reordena igual):** `kpi` (la cifra principal es **hero**, ancho doble y resaltada) → gráficos (`ranking`/`trend`/`share`) → `table`/`structure` → `context` (strip compacto de una línea, datos adicionales) → `insights` (fila completa).
 
 ## Layout (sin scroll, una pantalla)
 
 La grilla ancla a la altura de la ventana: las filas se estiran para llenar la pantalla y las cards se encogen; el scroll solo aparece si el contenido realmente no cabe (fallback móvil = scroll normal).
 
-**Filas de 12 columnas:** `kpi`/`context` = 3 (4 por fila) · `share` = 4 (3 por fila) · `ranking`/`trend`/`table` = 6 (2 por fila) · `insights` = 12 (fila completa). El motor de layout expande cards para rellenar huecos (`dense`) — envía las cards en orden de lectura y cada fila cierra en 12.
+**Filas de 12 columnas:** `kpi` = 3, la principal **6 (hero)** · `share` = 4 · `ranking`/`trend`/`table` = 6 (2 por fila) · `context`/`insights` = 12 (fila completa). El motor de layout expande cards para rellenar huecos (`dense`) — envía las cards por prioridad y cada fila cierra en 12.
 
 ## Recetas (intención → layout fijo)
 

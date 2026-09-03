@@ -599,6 +599,12 @@ const executors: Record<
         "Dashboard invalido. Revisa el catalogo: cards con type/title y datos numericos validos.";
       return { error: collector.lastDashboardError };
     }
+    const PRIORITY: Record<string, number> = {
+      kpi: 0, ranking: 1, trend: 1, share: 1, table: 2, structure: 3, context: 4, insights: 9,
+    };
+    dashboard.cards.sort(
+      (a, b) => (PRIORITY[a.type] ?? 5) - (PRIORITY[b.type] ?? 5)
+    );
     collector.lastDashboardError = null;
     collector.dashboard = dashboard;
     return "Dashboard aceptado.";

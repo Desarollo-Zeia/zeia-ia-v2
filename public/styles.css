@@ -202,14 +202,14 @@ body {
 .card--ranking .chart-wrap { min-height: 120px; }
 
 .share-legend {
-  margin-top: 14px;
+  margin-top: 10px;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 7px;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 16px;
 }
 .share-legend .row {
-  display: flex; justify-content: space-between; gap: 12px;
-  font-size: 13px;
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 12px;
   font-family: var(--font-mono);
 }
 .share-legend .row span:first-child {
@@ -247,6 +247,59 @@ tr:last-child td { border-bottom: none; }
   word-break: break-word;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Context strip (datos del sujeto, una sola linea compacta) ---------- */
+
+.card--context-strip { border-left: 4px solid var(--accent); }
+.card--context-strip h3 { margin-bottom: 8px; }
+
+.context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  align-items: baseline;
+}
+
+.context-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.context-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.context-value-sm {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+/* ---------- Hero kpi (cifra principal) ---------- */
+
+.card--hero {
+  border: 1px solid var(--accent);
+  background: linear-gradient(135deg, rgba(53, 224, 200, .1), var(--panel) 65%);
+  box-shadow: 0 0 24px rgba(53, 224, 200, .08);
+}
+
+.card--hero .kpi-value {
+  font-size: clamp(34px, 3.6vw, 56px);
+}
+
+.card--hero .kpi-unit {
+  font-size: 20px;
+  color: var(--text);
 }
 
 /* ---------- Structure (jerarquia tableros -> puntos) ---------- */
