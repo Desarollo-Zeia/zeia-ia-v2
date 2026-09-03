@@ -4,7 +4,9 @@ export type Card =
   | { type: "ranking"; title: string; unit: string; group?: string; items: Array<{ label: string; value: number }> }
   | { type: "trend"; title: string; unit: string; group?: string; points: Array<{ t: string; v: number }> }
   | { type: "table"; title: string; group?: string; columns: string[]; rows: string[][] }
-  | { type: "context"; title: string; group?: string; items: Array<{ label: string; value: string }> };
+  | { type: "context"; title: string; group?: string; items: Array<{ label: string; value: string }> }
+  | { type: "structure"; title: string; group?: string; items: Array<{ label: string; value: string; points: string[] }> }
+  | { type: "insights"; title: string; group?: string; items: string[] };
 
 export interface Dashboard {
   title: string;
@@ -18,9 +20,12 @@ const MAX_POINTS = 60;
 const MAX_COLUMNS = 6;
 const MAX_ROWS = 12;
 const MAX_CONTEXT = 6;
+const MAX_STRUCTURE = 8;
+const MAX_STRUCTURE_POINTS = 12;
+const MAX_INSIGHTS = 6;
 
-const str = (v: unknown): string =>
-  typeof v === "string" ? v.trim().slice(0, 200) : "";
+const str = (v: unknown, max = 200): string =>
+  typeof v === "string" ? v.trim().slice(0, max) : "";
 
 const num = (v: unknown): number | null => {
   const n = Number(v);
@@ -123,6 +128,29 @@ function validateCard(raw: unknown): Card | null {
       }
       if (items.length === 0) return null;
       return { type: "context", title, group, items };
+    }
+    case "structure": {
+      if (!Array.isArray(c.items)) return null;
+      const items: Array<{ label: string; value: string; points: string[] }> = [];
+      for (const raw of c.items.slice(0, MAX_STRUCTURE)) {
+        if (raw == null || typeof raw !== "object") continue;
+        const label = str((raw as Record<string, unknown>).label);
+        const value = str((raw as Record<string, unknown>).value);
+        const points = strArray((raw as Record<string, unknown>).points, MAX_STRUCTURE_POINTS);
+        if (!label) continue;
+        items.push({ label, value, points });
+      }
+      if (items.length === 0) return null;
+      return { type: "structure", title, group, items };
+    }
+    case "insights": {
+      if (!Array.isArray(c.items)) return null;
+      const items = c.items
+        .slice(0, MAX_INSIGHTS)
+        .map((x) => (typeof x === "string" ? str(x, 300) : str((x as Record<string, unknown>)?.value ?? (x as Record<string, unknown>)?.label, 300)))
+        .filter(Boolean);
+      if (items.length === 0) return null;
+      return { type: "insights", title, group, items };
     }
     default:
       return null;

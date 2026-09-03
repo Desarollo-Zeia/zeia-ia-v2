@@ -1,4 +1,4 @@
-import { runAgent } from "./agent";
+import { runAgent, freshSessionState, type AgentSessionState } from "./agent";
 import { env } from "./config";
 
 const MIME: Record<string, string> = {
@@ -31,6 +31,7 @@ interface ChatMessage {
 interface Session {
   messages: ChatMessage[];
   lastSeen: number;
+  state: AgentSessionState;
 }
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -45,7 +46,7 @@ function getSession(id: string): Session {
   }
   let session = sessions.get(id);
   if (!session) {
-    session = { messages: [], lastSeen: now };
+    session = { messages: [], lastSeen: now, state: freshSessionState() };
     sessions.set(id, session);
   }
   session.lastSeen = now;
@@ -94,7 +95,7 @@ const server = Bun.serve({
           ? session.messages.map((m) => ({ role: m.role, content: m.content }))
           : [];
         history.push({ role: "user", content: body.message });
-        const { reply, dashboard } = await runAgent(history, scope);
+        const { reply, dashboard } = await runAgent(history, scope, undefined, session?.state ?? freshSessionState());
         if (session) {
           session.messages = history
             .filter(

@@ -10,6 +10,8 @@ const SPAN_RULES = {
   ranking: { base: 6, max: 8 },
   trend: { base: 6, max: 8 },
   table: { base: 6, max: 12 },
+  structure: { base: 6, max: 12 },
+  insights: { base: 12, max: 12 },
 };
 
 const TOOLTIP_STYLE = {
@@ -161,6 +163,8 @@ function buildCard(card) {
     case "trend": return buildTrend(node, card);
     case "table": return buildTable(node, card);
     case "context": return buildContext(node, card);
+    case "structure": return buildStructure(node, card);
+    case "insights": return buildInsights(node, card);
     default: return null;
   }
 }
@@ -269,12 +273,20 @@ function buildRanking(node, card) {
           tooltip: {
             ...TOOLTIP_STYLE,
             callbacks: {
-              label: (ctx) => ` ${fmt(ctx.parsed.x)} ${card.unit}`,
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = total ? ((ctx.parsed.x / total) * 100).toFixed(1) : 0;
+                return ` ${fmt(ctx.parsed.x)} ${card.unit} (${pct}% del total)`;
+              },
             },
           },
         },
         scales: {
-          x: { ticks: { color: "#8a99ab" }, grid: { color: "#1c2735" } },
+          x: {
+            title: { display: Boolean(card.unit), text: card.unit, color: "#8a99ab", font: { family: "JetBrains Mono", size: 11 } },
+            ticks: { color: "#8a99ab" },
+            grid: { color: "#1c2735" },
+          },
           y: { ticks: { color: "#e8eef5", font: { family: "JetBrains Mono" } }, grid: { display: false } },
         },
       },
@@ -329,7 +341,11 @@ function buildTrend(node, card) {
         },
         scales: {
           x: { ticks: { color: "#8a99ab", maxTicksLimit: 12, font: { family: "JetBrains Mono" } }, grid: { display: false } },
-          y: { ticks: { color: "#8a99ab", font: { family: "JetBrains Mono" } }, grid: { color: "#1c2735" } },
+          y: {
+            title: { display: Boolean(card.unit), text: card.unit, color: "#8a99ab", font: { family: "JetBrains Mono", size: 11 } },
+            ticks: { color: "#8a99ab", font: { family: "JetBrains Mono" } },
+            grid: { color: "#1c2735" },
+          },
         },
       },
     });
@@ -374,11 +390,70 @@ function buildContext(node, card) {
   return node;
 }
 
+function buildStructure(node, card) {
+  node.appendChild(el("h3", null, card.title));
+  const list = el("div", "structure-list");
+  card.items.forEach((item, idx) => {
+    const panel = el("div", "structure-panel");
+    const color = PALETTE[idx % PALETTE.length];
+    panel.style.setProperty("--panel-accent", color);
+
+    const head = el("div", "structure-head");
+    const name = el("span", "structure-name", item.label);
+    name.title = item.label;
+    head.appendChild(name);
+    if (item.value) head.appendChild(el("span", "structure-badge", item.value));
+    panel.appendChild(head);
+
+    if (item.points && item.points.length > 0) {
+      const chips = el("div", "structure-points");
+      for (const point of item.points.slice(0, 12)) {
+        const chip = el("span", "point-chip", point);
+        chip.title = point;
+        chips.appendChild(chip);
+      }
+      panel.appendChild(chips);
+    }
+    list.appendChild(panel);
+  });
+  node.appendChild(list);
+  return node;
+}
+
+function buildInsights(node, card) {
+  node.appendChild(el("h3", null, card.title));
+  const list = el("ul", "insight-list");
+  for (const text of card.items) {
+    const li = el("li", null, text);
+    list.appendChild(li);
+  }
+  node.appendChild(list);
+  return node;
+}
+
+function md(text) {
+  const escape = (s) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const lines = String(text).split("\n").map((line) => {
+    const heading = /^#{1,6}\s+(.*)$/.exec(line.trim());
+    const content = heading ? heading[1] : line;
+    const formatted = escape(content)
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, '<span class="mono">$1</span>');
+    if (heading) return `<div class="md-h">${formatted}</div>`;
+    if (/^\s*[-*•]\s+/.test(line)) return `<div class="md-li">${formatted.replace(/^\s*[-*•]\s+/, "• ")}</div>`;
+    return `<div>${formatted}</div>`;
+  });
+  return lines.join("");
+}
+
 function addMsg(role, text, loading) {
   const log = document.getElementById("chat-log");
   log.hidden = false;
-  const msg = el("div", `msg ${role}`, text);
+  const msg = el("div", `msg ${role}`);
   if (loading) msg.classList.add("loading");
+  if (loading) msg.textContent = text;
+  else msg.innerHTML = md(text);
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
   return msg;

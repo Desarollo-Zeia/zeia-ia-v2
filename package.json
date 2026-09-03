@@ -15,6 +15,7 @@
     "chat": "bun run src/main.ts",
     "server": "bun run src/server.ts",
     "db-test": "bun run src/tools-test.ts",
+    "briefing": "bun run src/briefing.ts",
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
