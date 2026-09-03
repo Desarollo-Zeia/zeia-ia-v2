@@ -231,62 +231,24 @@ td { font-variant-numeric: tabular-nums; }
 tbody tr:hover { background: rgba(76, 195, 255, .04); }
 tr:last-child td { border-bottom: none; }
 
-/* ---------- Context (dato del sujeto, card independiente) ---------- */
+/* ---------- Context (dato puntual del sujeto: card chica y alargada) ---------- */
 
 .card--context {
   justify-content: center;
   border-left: 4px solid var(--accent);
-  background: linear-gradient(135deg, rgba(53, 224, 200, .08), var(--panel) 55%);
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background: linear-gradient(135deg, rgba(53, 224, 200, .06), var(--panel) 60%);
 }
-.card--context h3 { margin-bottom: 10px; }
+.card--context h3 { margin-bottom: 4px; }
 
 .context-value {
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
   word-break: break-word;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-}
-
-/* ---------- Context strip (datos del sujeto, una sola linea compacta) ---------- */
-
-.card--context-strip {
-  border-left: 4px solid var(--accent);
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-.card--context-strip h3 { margin-bottom: 6px; }
-
-.context-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 22px;
-  align-items: baseline;
-}
-
-.context-chip {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
-.context-label {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  font-family: var(--font-mono);
-  white-space: nowrap;
-}
-
-.context-value-sm {
-  font-size: 14px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  word-break: break-word;
 }
 
 /* ---------- Hero kpi (cifra principal) ---------- */

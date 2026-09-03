@@ -5,8 +5,7 @@ const PALETTE = [
 
 const SPAN_RULES = {
   kpi: { base: 3, max: 6 },
-  context: { base: 12, max: 12 },
-  "context-strip": { base: 12, max: 12 },
+  context: { base: 3, max: 6 },
   share: { base: 4, max: 6 },
   ranking: { base: 6, max: 12 },
   trend: { base: 6, max: 12 },
@@ -17,12 +16,13 @@ const SPAN_RULES = {
 
 const ROW_WEIGHT = {
   kpi: 1,
+  context: 0,
   "context-strip": 0,
-  share: 2,
-  ranking: 2,
-  trend: 2,
+  share: 3,
+  ranking: 3,
+  trend: 3,
   table: 2,
-  structure: 2,
+  structure: 3,
   insights: 1,
 };
 
@@ -93,11 +93,9 @@ function renderDashboard(dashboard) {
   let heroUsed = false;
   for (const card of dashboard.cards) {
     if (card.type === "context") {
-      expanded.push({
-        type: "context-strip",
-        title: card.title,
-        items: card.items,
-      });
+      for (const item of card.items) {
+        expanded.push({ type: "context", title: item.label, value: item.value });
+      }
     } else if (card.type === "kpi" && !heroUsed) {
       heroUsed = true;
       expanded.push({ ...card, hero: true });
@@ -131,11 +129,12 @@ function renderDashboard(dashboard) {
     grid.style.gridTemplateRows = units
       .map((u) => {
         if (u.kind === "head") return "minmax(30px, auto)";
-        if (u.items.every((it) => it.card.type === "context-strip")) return "auto";
+        if (u.items.every((it) => it.card.type === "context")) return "auto";
         const single = u.items.length === 1 ? u.items[0].card.type : null;
         const weight = Math.max(...u.items.map((it) => ROW_WEIGHT[it.card.type] ?? 1));
         if (single === "insights") return "minmax(120px, 1fr)";
-        return `minmax(${weight >= 2 ? 190 : 130}px, ${weight}fr)`;
+        const minHeight = weight >= 3 ? 230 : weight >= 2 ? 180 : 130;
+        return `minmax(${minHeight}px, ${weight}fr)`;
       })
       .join(" ");
   } else {
