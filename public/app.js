@@ -4,11 +4,11 @@ const PALETTE = [
 ];
 
 const SPAN_RULES = {
-  kpi: { base: 3, max: 4 },
-  context: { base: 3, max: 4 },
-  share: { base: 4, max: 5 },
-  ranking: { base: 6, max: 8 },
-  trend: { base: 6, max: 8 },
+  kpi: { base: 3, max: 6 },
+  context: { base: 3, max: 6 },
+  share: { base: 4, max: 6 },
+  ranking: { base: 6, max: 12 },
+  trend: { base: 6, max: 12 },
   table: { base: 6, max: 12 },
   structure: { base: 6, max: 12 },
   insights: { base: 12, max: 12 },

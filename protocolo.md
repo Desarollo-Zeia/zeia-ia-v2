@@ -43,7 +43,13 @@ Todas las cards aceptan `group` (opcional): cards con el mismo `group` se agrupa
 - Nada de donuts con más de 8 categorías: agrupar en "Otros" o usar `table`.
 - **Máximo DOS gráficos** (trend/ranking/share) por dashboard, el resto son de apoyo (kpi/context/table).
 
-**Orden de lectura en pantalla (fijo):** `context` → `kpi` → gráfico principal (ancho doble) → `table`.
+**Orden de lectura en pantalla (fijo):** `context` → `kpi` → gráfico principal (ancho doble) → `table` → `insights`.
+
+## Layout (sin scroll, una pantalla)
+
+La grilla ancla a la altura de la ventana: las filas se estiran para llenar la pantalla y las cards se encogen; el scroll solo aparece si el contenido realmente no cabe (fallback móvil = scroll normal).
+
+**Filas de 12 columnas:** `kpi`/`context` = 3 (4 por fila) · `share` = 4 (3 por fila) · `ranking`/`trend`/`table` = 6 (2 por fila) · `insights` = 12 (fila completa). El motor de layout expande cards para rellenar huecos (`dense`) — envía las cards en orden de lectura y cada fila cierra en 12.
 
 ## Recetas (intención → layout fijo)
 
