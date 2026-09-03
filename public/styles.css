@@ -589,6 +589,33 @@ tr:last-child td { border-bottom: none; }
 }
 .analyze-btn:hover { background: var(--accent); color: #04211d; }
 
+.findings-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+}
+.fc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.fc::before {
+  content: "";
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.fc--critical { color: #ff6b6b; }
+.fc--critical::before { background: #ff6b6b; }
+.fc--warning { color: #ffc857; }
+.fc--warning::before { background: #ffc857; }
+.fc--info { color: #4cc3ff; }
+.fc--info::before { background: #4cc3ff; }
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

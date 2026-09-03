@@ -571,6 +571,7 @@ function renderFindingsPanel(a) {
   clearDashboard();
   const grid = document.getElementById("cards");
   grid.className = "grid";
+  grid.style.gridTemplateRows = "";
   setMode("MODO ADMINISTRADOR", "#35e0c8");
   const meta = document.getElementById("dash-meta");
   meta.innerHTML = "";
@@ -578,6 +579,7 @@ function renderFindingsPanel(a) {
   meta.appendChild(el("p", null, `Generado ${a.generated_at.slice(0, 16).replace("T", " ")}`));
 
   const gradeMeta = { ok: ["OPERATIVO", "#34d399"], warning: ["ATENCION", "#ffc857"], critical: ["CRITICO", "#ff6b6b"] }[a.grade];
+  const span = (node, n) => { node.style.gridColumn = `span ${n}`; return node; };
   const cards = [];
 
   const scoreCard = el("section", "card card--kpi card--hero");
@@ -589,21 +591,33 @@ function renderFindingsPanel(a) {
   scoreBody.appendChild(scoreRow);
   scoreBody.appendChild(el("div", "kpi-note", gradeMeta[0]));
   scoreCard.appendChild(scoreBody);
-  cards.push(scoreCard);
+  cards.push(span(scoreCard, 4));
 
   if (a.cost) {
     const proj = el("section", "card card--kpi");
-    proj.appendChild(el("h3", null, "Factura proyectada (ciclo actual)"));
+    proj.appendChild(el("h3", null, "Costo de energia (30 dias)"));
     const pb = el("div", "kpi-body");
     const pr = el("div");
-    pr.appendChild(el("span", "kpi-value", fmt(a.cost.cycle?.projected_cost ?? a.cost.total_cost)));
+    pr.appendChild(el("span", "kpi-value", fmt(a.cost.total_cost)));
     pr.appendChild(el("span", "kpi-unit", a.cost.currency));
     pb.appendChild(pr);
-    pb.appendChild(el("div", "kpi-note", `Consumo 30d: ${fmt(a.cost.energy_kwh ?? 0)} kWh`));
+    pb.appendChild(el("div", "kpi-note", `${fmt(a.cost.energy_kwh ?? 0)} kWh · demanda pico ${fmt(a.cost.max_demand_kw_peak ?? 0)} kW`));
     proj.appendChild(pb);
-    cards.push(proj);
+    cards.push(span(proj, 4));
   }
 
+  const counts = { critical: 0, warning: 0, info: 0 };
+  for (const f of a.findings) counts[f.severity]++;
+  const sumCard = el("section", "card card--kpi");
+  sumCard.appendChild(el("h3", null, "Hallazgos"));
+  const sumBody = el("div", "kpi-body findings-counts");
+  sumBody.appendChild(el("div", "fc fc--critical", `${counts.critical} críticos`));
+  sumBody.appendChild(el("div", "fc fc--warning", `${counts.warning} en atención`));
+  sumBody.appendChild(el("div", "fc fc--info", `${counts.info} en vigilancia`));
+  sumCard.appendChild(sumBody);
+  cards.push(span(sumCard, 4));
+
+  const SPANS = { critical: 6, warning: 4, info: 4 };
   const groups = [
     ["critical", "Requiere atencion inmediata"],
     ["warning", "Requiere atencion"],
@@ -617,8 +631,8 @@ function renderFindingsPanel(a) {
     dot.style.background = SEVERITY_META[sev].color;
     head.appendChild(dot);
     head.appendChild(el("h2", null, `${title} (${items.length})`));
-    cards.push(head);
-    for (const f of items) cards.push(buildFindingCard(f));
+    cards.push(span(head, 12));
+    for (const f of items) cards.push(span(buildFindingCard(f), SPANS[sev]));
   }
 
   if (a.ok_summary && a.ok_summary.length > 0) {
@@ -627,7 +641,7 @@ function renderFindingsPanel(a) {
     const list = el("ul", "insight-list");
     for (const t of a.ok_summary) list.appendChild(el("li", null, t));
     okCard.appendChild(list);
-    cards.push(okCard);
+    cards.push(span(okCard, 12));
   }
 
   for (const node of cards) grid.appendChild(node);
