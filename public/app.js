@@ -515,6 +515,106 @@ function addMsg(role, text, loading) {
   return msg;
 }
 
+const SEVERITY_META = {
+  critical: { label: "CRITICO", color: "#ff6b6b" },
+  warning: { label: "ATENCION", color: "#ffc857" },
+  info: { label: "INFO", color: "#4cc3ff" },
+};
+
+async function loadFindings() {
+  try {
+    const res = await fetch("/findings");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.findings) renderFindingsPanel(data);
+  } catch {
+    /* sin panel: el dashboard queda con el estado vacio normal */
+  }
+}
+
+function renderFindingsPanel(a) {
+  clearDashboard();
+  const grid = document.getElementById("cards");
+  grid.className = "grid";
+  const meta = document.getElementById("dash-meta");
+  meta.innerHTML = "";
+  meta.appendChild(el("h2", null, "Modo Administrador"));
+  meta.appendChild(el("p", null, `Generado ${a.generated_at.slice(0, 16).replace("T", " ")}`));
+
+  const gradeMeta = { ok: ["OPERATIVO", "#34d399"], warning: ["ATENCION", "#ffc857"], critical: ["CRITICO", "#ff6b6b"] }[a.grade];
+  const cards = [];
+
+  cards.push(el("div", "score-wrap"));
+  const scoreCard = el("section", "card card--kpi card--hero");
+  scoreCard.appendChild(el("h3", null, "Score de instalacion"));
+  const scoreBody = el("div", "kpi-body");
+  const scoreRow = el("div");
+  scoreRow.appendChild(el("span", "kpi-value", String(a.score)));
+  scoreRow.appendChild(el("span", "kpi-unit", "/ 100"));
+  scoreBody.appendChild(scoreRow);
+  scoreBody.appendChild(el("div", "kpi-note", gradeMeta[0]));
+  scoreCard.appendChild(scoreBody);
+  cards.appendChild(scoreCard);
+
+  if (a.cost) {
+    const proj = el("section", "card card--kpi");
+    proj.appendChild(el("h3", null, "Factura proyectada (ciclo actual)"));
+    const pb = el("div", "kpi-body");
+    const pr = el("div");
+    pr.appendChild(el("span", "kpi-value", fmt(a.cost.cycle?.projected_cost ?? a.cost.total_cost)));
+    pr.appendChild(el("span", "kpi-unit", a.cost.currency));
+    pb.appendChild(pr);
+    pb.appendChild(el("div", "kpi-note", `Consumo 30d: ${fmt(a.cost.energy_kwh ?? 0)} kWh`));
+    proj.appendChild(pb);
+    cards.appendChild(proj);
+  }
+
+  const groups = [
+    ["critical", "Requiere atencion inmediata"],
+    ["warning", "Requiere atencion"],
+    ["info", "Vigilar"],
+  ];
+  for (const [sev, title] of groups) {
+    const items = a.findings.filter((f) => f.severity === sev);
+    if (items.length === 0) continue;
+    const head = el("div", "section-head findings-head");
+    const dot = el("span", "findings-dot");
+    dot.style.background = SEVERITY_META[sev].color;
+    head.appendChild(dot);
+    head.appendChild(el("h2", null, `${title} (${items.length})`));
+    cards.appendChild(head);
+    for (const f of items) cards.push(buildFindingCard(f));
+  }
+
+  if (a.ok_summary && a.ok_summary.length > 0) {
+    const okCard = el("section", "card card--insights");
+    okCard.appendChild(el("h3", null, "Todo en orden"));
+    const list = el("ul", "insight-list");
+    for (const t of a.ok_summary) list.appendChild(el("li", null, t));
+    okCard.appendChild(list);
+    cards.push(okCard);
+  }
+
+  for (const node of [...cards.children]) grid.appendChild(node);
+  document.getElementById("empty-state").hidden = true;
+}
+
+function buildFindingCard(f) {
+  const node = el("section", `card finding finding--${f.severity}`);
+  const head = el("div", "finding-head");
+  head.appendChild(el("span", "finding-sev", SEVERITY_META[f.severity].label));
+  head.appendChild(el("span", "finding-cat", f.asset));
+  node.appendChild(head);
+  node.appendChild(el("h3", "finding-title", f.title));
+  if (f.money_impact != null)
+    node.appendChild(el("div", "finding-impact", `${fmt(f.money_impact)} ${"USD"} / mes`));
+  node.appendChild(el("p", "finding-detail", f.detail));
+  const btn = el("button", "analyze-btn", "Analizar con ZeIA ▸");
+  btn.addEventListener("click", () => send(f.suggested_question));
+  node.appendChild(btn);
+  return node;
+}
+
 async function send(text) {
   const input = document.getElementById("chat-input");
   const button = document.getElementById("chat-send");
@@ -556,3 +656,5 @@ document.getElementById("chat-form").addEventListener("submit", (e) => {
 document.querySelectorAll(".suggestions .chip").forEach((chip) => {
   chip.addEventListener("click", () => send(chip.textContent));
 });
+
+loadFindings();

@@ -6,7 +6,7 @@ const clamp = (value: number, min: number, max: number) =>
 
 const toNum = (v: unknown): number | null => (v == null ? null : Number(v));
 
-const NORMALIZED_P = sql`
+export const NORMALIZED_P = sql`
   CASE
     WHEN mp.capacity_amperage IS NOT NULL
       AND mp.capacity_voltage IS NOT NULL
@@ -17,7 +17,7 @@ const NORMALIZED_P = sql`
   END
 `;
 
-const NORMALIZED_Q = sql`
+export const NORMALIZED_Q = sql`
   CASE
     WHEN mp.capacity_amperage IS NOT NULL
       AND mp.capacity_voltage IS NOT NULL

@@ -313,6 +313,9 @@ archivos sincronizados. Ese es el problema raíz de la fuente de verdad.
 | S8 | `billingdata` de `energy_headquarter.billing_data_id` es la tarifa de energía; `billingactive` tiene 4 filas activas con `billing_permission` distintos (probablemente módulos: energía/confort/agua) y una con currency PEN | usar la fila equivocada cambiaría moneda y precios; validar con plataforma qué permission corresponde a cada módulo |
 | S9 | La penalización reactiva aplica sobre `max(0, EQ − 30% × EP)` con el cargo de `billingdata` (0.0492 USD/kvarh) | si el pliego real usa otra fórmula (percentil, exclusión de puntas), el costo reactiva difiere; para Oechsle son ~594 USD/mes — validar con factura histórica |
 | S10 | La proyección de ciclo usa costo/día = total / horas distintas con datos, escalado a los días del ciclo | si el consumo del resto del ciclo difiere del promedio (estacionalidad), la proyección se desvía |
+| S11 | Horario de operación aprendido por punto: horas "abiertas" = promedio de potencia ≥ 10% del pico horario del punto en las 4 semanas previas (ventana 31d→3d antes de la última lectura); consumo nocturno = kWh recientes (3d) en horas NO abiertas, con umbrales >5 kWh y ≥8% del total | falsos positivos con puntos de consumo verdaderamente 24/7 (refrigeración) o baselines cortos |
+| S12 | Health Score = 100 − (25×crítico + 10×advertencia + 3×info), sin ponderación por monto | dos hallazgos con severidades iguales pueden tener impactos económicos muy distintos; futura versión: score ponderado por dinero |
+| S13 | Demanda pico del analyzer = suma de acometidas `is_main` por hora (misma base que cost_analysis); lo contratado sale de `enterprises_power.is_power_contracted_active` (686 kW en Oechsle) | si la acometida facturada real es un solo punto (no la suma), el ratio pico/contratado cambia |
 
 ---
 
