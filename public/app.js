@@ -309,12 +309,13 @@ function buildRanking(node, card) {
         indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        interaction: { intersect: false, mode: "index" },
+        interaction: { mode: "nearest", intersect: true },
         plugins: {
           legend: { display: false },
           tooltip: {
             ...TOOLTIP_STYLE,
             callbacks: {
+              title: (items) => items[0]?.label ?? "",
               label: (ctx) => {
                 const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
                 const pct = total ? ((ctx.parsed.x / total) * 100).toFixed(1) : 0;
