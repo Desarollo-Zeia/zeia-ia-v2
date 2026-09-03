@@ -516,12 +516,6 @@ function addMsg(role, text, loading) {
   return msg;
 }
 
-const SEVERITY_META = {
-  critical: { label: "CRITICO", color: "#ff6b6b" },
-  warning: { label: "ATENCION", color: "#ffc857" },
-  info: { label: "INFO", color: "#4cc3ff" },
-};
-
 function setMode(label, color) {
   const badge = document.getElementById("mode-badge");
   if (!badge) return;
@@ -569,99 +563,136 @@ async function loadFindings() {
 
 function renderFindingsPanel(a) {
   clearDashboard();
-  const grid = document.getElementById("cards");
-  grid.className = "grid";
-  grid.style.gridTemplateRows = "";
+  const root = document.getElementById("cards");
+  root.className = "adm";
+  root.style.gridTemplateRows = "";
   setMode("MODO ADMINISTRADOR", "#35e0c8");
   const meta = document.getElementById("dash-meta");
   meta.innerHTML = "";
   meta.appendChild(el("h2", null, "Modo Administrador"));
-  meta.appendChild(el("p", null, `Generado ${a.generated_at.slice(0, 16).replace("T", " ")}`));
-
-  const gradeMeta = { ok: ["OPERATIVO", "#34d399"], warning: ["ATENCION", "#ffc857"], critical: ["CRITICO", "#ff6b6b"] }[a.grade];
-  const span = (node, n) => { node.style.gridColumn = `span ${n}`; return node; };
-  const cards = [];
-
-  const scoreCard = el("section", "card card--kpi card--hero");
-  scoreCard.appendChild(el("h3", null, "Score de instalacion"));
-  const scoreBody = el("div", "kpi-body");
-  const scoreRow = el("div");
-  scoreRow.appendChild(el("span", "kpi-value", String(a.score)));
-  scoreRow.appendChild(el("span", "kpi-unit", "/ 100"));
-  scoreBody.appendChild(scoreRow);
-  scoreBody.appendChild(el("div", "kpi-note", gradeMeta[0]));
-  scoreCard.appendChild(scoreBody);
-  cards.push(span(scoreCard, 4));
-
-  if (a.cost) {
-    const proj = el("section", "card card--kpi");
-    proj.appendChild(el("h3", null, "Costo de energia (30 dias)"));
-    const pb = el("div", "kpi-body");
-    const pr = el("div");
-    pr.appendChild(el("span", "kpi-value", fmt(a.cost.total_cost)));
-    pr.appendChild(el("span", "kpi-unit", a.cost.currency));
-    pb.appendChild(pr);
-    pb.appendChild(el("div", "kpi-note", `${fmt(a.cost.energy_kwh ?? 0)} kWh · demanda pico ${fmt(a.cost.max_demand_kw_peak ?? 0)} kW`));
-    proj.appendChild(pb);
-    cards.push(span(proj, 4));
-  }
+  meta.appendChild(el("p", null, `Actualizado ${a.generated_at.slice(11, 16)}`));
+  document.getElementById("empty-state").hidden = true;
 
   const counts = { critical: 0, warning: 0, info: 0 };
   for (const f of a.findings) counts[f.severity]++;
-  const sumCard = el("section", "card card--kpi");
-  sumCard.appendChild(el("h3", null, "Hallazgos"));
-  const sumBody = el("div", "kpi-body findings-counts");
-  sumBody.appendChild(el("div", "fc fc--critical", `${counts.critical} críticos`));
-  sumBody.appendChild(el("div", "fc fc--warning", `${counts.warning} en atención`));
-  sumBody.appendChild(el("div", "fc fc--info", `${counts.info} en vigilancia`));
-  sumCard.appendChild(sumBody);
-  cards.push(span(sumCard, 4));
 
-  const SPANS = { critical: 6, warning: 4, info: 4 };
-  const groups = [
-    ["critical", "Requiere atencion inmediata"],
-    ["warning", "Requiere atencion"],
-    ["info", "Vigilar"],
+  /* 1. Estado: una franja, tres datos, cero decoracion */
+  const gradeMeta = { ok: ["Operativo", "ok"], warning: ["Atención", "warning"], critical: ["Crítico", "critical"] }[a.grade];
+  const hero = el("div", "adm-hero");
+  const scoreBlock = el("div", "adm-hero-item adm-hero-item--score");
+  scoreBlock.appendChild(el("div", "adm-label", "Estado de la instalación"));
+  const scoreLine = el("div", "adm-score-line");
+  scoreLine.appendChild(el("span", `adm-score adm-score--${gradeMeta[1]}`, String(a.score)));
+  scoreLine.appendChild(el("span", "adm-score-den", "/ 100"));
+  scoreLine.appendChild(el("span", `adm-grade adm-grade--${gradeMeta[1]}`, gradeMeta[0]));
+  scoreBlock.appendChild(scoreLine);
+  hero.appendChild(scoreBlock);
+
+  if (a.cost) {
+    const costBlock = el("div", "adm-hero-item");
+    costBlock.appendChild(el("div", "adm-label", "Costo de energía · 30 días"));
+    const costLine = el("div", "adm-score-line");
+    costLine.appendChild(el("span", "adm-cost", fmt(a.cost.total_cost)));
+    costLine.appendChild(el("span", "adm-cost-cur", a.cost.currency));
+    costBlock.appendChild(costLine);
+    costBlock.appendChild(el("div", "adm-sub", `${fmt(a.cost.energy_kwh ?? 0)} kWh · pico ${fmt(a.cost.max_demand_kw_peak ?? 0)} kW`));
+    hero.appendChild(costBlock);
+  }
+
+  const countBlock = el("div", "adm-hero-item");
+  countBlock.appendChild(el("div", "adm-label", "Hallazgos"));
+  const countLines = el("div", "adm-counts");
+  countLines.appendChild(el("div", "fc fc--critical", `${counts.critical} requieren acción`));
+  countLines.appendChild(el("div", "fc fc--warning", `${counts.warning} en atención`));
+  countLines.appendChild(el("div", "fc fc--info", `${counts.info} en vigilancia`));
+  countBlock.appendChild(countLines);
+  hero.appendChild(countBlock);
+  root.appendChild(hero);
+
+  /* 2. Acciones requeridas: critical + warning como cola priorizada */
+  const acciones = [
+    ...a.findings.filter((f) => f.severity === "critical"),
+    ...a.findings.filter((f) => f.severity === "warning"),
   ];
-  for (const [sev, title] of groups) {
-    const items = a.findings.filter((f) => f.severity === sev);
-    if (items.length === 0) continue;
-    const head = el("div", "section-head findings-head");
-    const dot = el("span", "findings-dot");
-    dot.style.background = SEVERITY_META[sev].color;
-    head.appendChild(dot);
-    head.appendChild(el("h2", null, `${title} (${items.length})`));
-    cards.push(span(head, 12));
-    for (const f of items) cards.push(span(buildFindingCard(f), SPANS[sev]));
+  if (acciones.length > 0) {
+    root.appendChild(sectionLabel("Acciones requeridas", "#ff6b6b"));
+    acciones.forEach((f, i) => root.appendChild(buildActionRow(f, i)));
   }
 
+  /* 3. Vigilar: filas compactas */
+  const vigilar = a.findings.filter((f) => f.severity === "info");
+  if (vigilar.length > 0) {
+    root.appendChild(sectionLabel("Vigilar", "#4cc3ff"));
+    for (const f of vigilar) root.appendChild(buildWatchRow(f));
+  }
+
+  /* 4. En orden: franja final discreta */
   if (a.ok_summary && a.ok_summary.length > 0) {
-    const okCard = el("section", "card card--insights");
-    okCard.appendChild(el("h3", null, "Todo en orden"));
-    const list = el("ul", "insight-list");
+    const ok = el("div", "adm-ok");
+    const list = el("ul");
     for (const t of a.ok_summary) list.appendChild(el("li", null, t));
-    okCard.appendChild(list);
-    cards.push(span(okCard, 12));
+    ok.appendChild(el("span", "adm-ok-title", "En orden"));
+    ok.appendChild(list);
+    root.appendChild(ok);
   }
-
-  for (const node of cards) grid.appendChild(node);
-  document.getElementById("empty-state").hidden = true;
 }
 
-function buildFindingCard(f) {
-  const node = el("section", `card finding finding--${f.severity}`);
-  const head = el("div", "finding-head");
-  head.appendChild(el("span", "finding-sev", SEVERITY_META[f.severity].label));
-  head.appendChild(el("span", "finding-cat", f.asset));
-  node.appendChild(head);
-  node.appendChild(el("h3", "finding-title", f.title));
-  if (f.money_impact != null)
-    node.appendChild(el("div", "finding-impact", `${fmt(f.money_impact)} ${"USD"} / mes`));
-  node.appendChild(el("p", "finding-detail", f.detail));
-  const btn = el("button", "analyze-btn", "Analizar con ZeIA ▸");
+function sectionLabel(text, color) {
+  const head = el("div", "adm-section");
+  const bar = el("span", "adm-section-bar");
+  bar.style.background = color;
+  head.appendChild(bar);
+  head.appendChild(el("h2", null, text));
+  return head;
+}
+
+function moneyNode(amount) {
+  const wrap = el("div", "adm-money");
+  if (amount == null) {
+    wrap.classList.add("adm-money--na");
+    wrap.textContent = "—";
+    return wrap;
+  }
+  if (amount < 0) {
+    wrap.classList.add("adm-money--save");
+    wrap.innerHTML = `${fmt(Math.abs(amount))} <small>USD/mes de ahorro</small>`;
+  } else {
+    wrap.innerHTML = `${fmt(amount)} <small>USD/mes</small>`;
+  }
+  return wrap;
+}
+
+function buildActionRow(f, i) {
+  const row = el("section", `adm-row adm-row--${f.severity}`);
+  row.appendChild(el("span", "adm-rank", String(i + 1).padStart(2, "0")));
+  const main = el("div", "adm-main");
+  const titleLine = el("div", "adm-title-line");
+  titleLine.appendChild(el("h3", "adm-title", f.title));
+  titleLine.appendChild(el("span", "adm-asset", f.asset));
+  main.appendChild(titleLine);
+  main.appendChild(el("p", "adm-detail", f.detail));
+  row.appendChild(main);
+  row.appendChild(moneyNode(f.money_impact));
+  const btn = el("button", "analyze-btn", "Analizar con ZeIA");
   btn.addEventListener("click", () => send(f.suggested_question));
-  node.appendChild(btn);
-  return node;
+  row.appendChild(btn);
+  return row;
+}
+
+function buildWatchRow(f) {
+  const row = el("section", `adm-row adm-row--watch adm-row--${f.severity}`);
+  const main = el("div", "adm-main");
+  const titleLine = el("div", "adm-title-line");
+  titleLine.appendChild(el("h3", "adm-title", f.title));
+  titleLine.appendChild(el("span", "adm-asset", f.asset));
+  main.appendChild(titleLine);
+  main.appendChild(el("p", "adm-detail", f.detail));
+  row.appendChild(main);
+  row.appendChild(moneyNode(f.money_impact));
+  const btn = el("button", "analyze-btn", "Analizar con ZeIA");
+  btn.addEventListener("click", () => send(f.suggested_question));
+  row.appendChild(btn);
+  return row;
 }
 
 async function send(text) {
