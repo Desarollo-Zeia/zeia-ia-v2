@@ -15,6 +15,17 @@ const SPAN_RULES = {
   insights: { base: 12, max: 12 },
 };
 
+const ROW_WEIGHT = {
+  kpi: 1,
+  "context-strip": 0,
+  share: 2,
+  ranking: 2,
+  trend: 2,
+  table: 2,
+  structure: 2,
+  insights: 1,
+};
+
 const TOOLTIP_STYLE = {
   backgroundColor: "#101722",
   borderColor: "#2a3a4e",
@@ -95,33 +106,56 @@ function renderDashboard(dashboard) {
     }
   }
 
+  const units = [];
   let currentGroup = null;
-  let sectionCards = [];
-
-  const flushSection = () => {
-    for (const item of packRows(sectionCards)) {
-      const node = buildCard(item.card);
-      if (!node) continue;
-      node.classList.add(`s${item.span}`);
-      grid.appendChild(node);
-    }
-    sectionCards = [];
+  let bucket = [];
+  const flushBucket = () => {
+    if (bucket.length === 0) return;
+    units.push({ kind: "row", items: packRows(bucket) });
+    bucket = [];
   };
 
   for (const card of expanded) {
     const group = card.group ?? "";
     if (group !== currentGroup) {
-      flushSection();
+      flushBucket();
       currentGroup = group;
-      if (group) {
-        const head = el("div", "section-head");
-        head.appendChild(el("h2", null, group));
-        grid.appendChild(head);
-      }
+      if (group) units.push({ kind: "head", title: group });
     }
-    sectionCards.push(card);
+    bucket.push(card);
   }
-  flushSection();
+  flushBucket();
+
+  const compact = window.matchMedia("(max-width: 940px)").matches;
+  if (!compact) {
+    grid.style.gridTemplateRows = units
+      .map((u) => {
+        if (u.kind === "head") return "minmax(30px, auto)";
+        if (u.items.every((it) => it.card.type === "context-strip")) return "auto";
+        const single = u.items.length === 1 ? u.items[0].card.type : null;
+        const weight = Math.max(...u.items.map((it) => ROW_WEIGHT[it.card.type] ?? 1));
+        if (single === "insights") return "minmax(120px, 1fr)";
+        return `minmax(${weight >= 2 ? 190 : 130}px, ${weight}fr)`;
+      })
+      .join(" ");
+  } else {
+    grid.style.gridTemplateRows = "";
+  }
+
+  for (const u of units) {
+    if (u.kind === "head") {
+      const head = el("div", "section-head");
+      head.appendChild(el("h2", null, u.title));
+      grid.appendChild(head);
+      continue;
+    }
+    for (const item of u.items) {
+      const node = buildCard(item.card);
+      if (!node) continue;
+      node.classList.add(`s${item.span}`);
+      grid.appendChild(node);
+    }
+  }
 }
 
 function packRows(cards) {
