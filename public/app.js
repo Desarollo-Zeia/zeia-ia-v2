@@ -580,7 +580,6 @@ function renderFindingsPanel(a) {
   const gradeMeta = { ok: ["OPERATIVO", "#34d399"], warning: ["ATENCION", "#ffc857"], critical: ["CRITICO", "#ff6b6b"] }[a.grade];
   const cards = [];
 
-  cards.push(el("div", "score-wrap"));
   const scoreCard = el("section", "card card--kpi card--hero");
   scoreCard.appendChild(el("h3", null, "Score de instalacion"));
   const scoreBody = el("div", "kpi-body");
@@ -590,7 +589,7 @@ function renderFindingsPanel(a) {
   scoreBody.appendChild(scoreRow);
   scoreBody.appendChild(el("div", "kpi-note", gradeMeta[0]));
   scoreCard.appendChild(scoreBody);
-  cards.appendChild(scoreCard);
+  cards.push(scoreCard);
 
   if (a.cost) {
     const proj = el("section", "card card--kpi");
@@ -602,7 +601,7 @@ function renderFindingsPanel(a) {
     pb.appendChild(pr);
     pb.appendChild(el("div", "kpi-note", `Consumo 30d: ${fmt(a.cost.energy_kwh ?? 0)} kWh`));
     proj.appendChild(pb);
-    cards.appendChild(proj);
+    cards.push(proj);
   }
 
   const groups = [
@@ -618,7 +617,7 @@ function renderFindingsPanel(a) {
     dot.style.background = SEVERITY_META[sev].color;
     head.appendChild(dot);
     head.appendChild(el("h2", null, `${title} (${items.length})`));
-    cards.appendChild(head);
+    cards.push(head);
     for (const f of items) cards.push(buildFindingCard(f));
   }
 
@@ -631,7 +630,7 @@ function renderFindingsPanel(a) {
     cards.push(okCard);
   }
 
-  for (const node of [...cards.children]) grid.appendChild(node);
+  for (const node of cards) grid.appendChild(node);
   document.getElementById("empty-state").hidden = true;
 }
 
