@@ -4,27 +4,49 @@ const PALETTE = [
 ];
 
 const SPAN_RULES = {
-  kpi: { base: 3, max: 6 },
-  context: { base: 3, max: 6 },
-  share: { base: 4, max: 6 },
-  ranking: { base: 6, max: 12 },
-  trend: { base: 6, max: 12 },
-  table: { base: 6, max: 12 },
-  structure: { base: 6, max: 12 },
-  insights: { base: 12, max: 12 },
+  kpi: { base: 3, max: 4, min: 3 },
+  context: { base: 3, max: 4, min: 3 },
+  share: { base: 4, max: 6, min: 4 },
+  ranking: { base: 6, max: 12, min: 6 },
+  trend: { base: 6, max: 12, min: 6 },
+  table: { base: 6, max: 12, min: 6 },
+  structure: { base: 6, max: 12, min: 6 },
+  insights: { base: 12, max: 12, min: 12 },
 };
 
-const ROW_WEIGHT = {
-  kpi: 1,
-  context: 0,
-  "context-strip": 0,
-  share: 3,
-  ranking: 3,
-  trend: 3,
-  table: 2,
-  structure: 3,
-  insights: 1,
-};
+const MIN_ROW = { context: 56, kpi: 96, analysis: 240, insights: 108 };
+
+function availableGridHeight() {
+  const host = document.getElementById("dashboard");
+  const cs = getComputedStyle(host);
+  return host.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+}
+
+function naturalHeight(card, span) {
+  const columns = 12;
+  switch (card.type) {
+    case "context":
+      return card.title.length + String(card.value ?? "").length > 34 ? 72 : 56;
+    case "kpi":
+      return card.hero ? 120 : 100;
+    case "insights":
+      return 52 + Math.min(card.items.length, 5) * 24;
+    case "table":
+      return 92 + card.rows.length * 34;
+    case "ranking":
+      return 118 + Math.min(card.items.length, 8) * 32;
+    case "share":
+      return 160 + Math.min(card.items.length, 8) * 18;
+    case "trend":
+      return (span / columns) * 1500 * 0.52;
+    case "structure":
+      return 118 + Math.min(card.items.length, 8) * 64;
+    default:
+      return 200;
+  }
+}
+
+const isAnalysis = (type) => ["ranking", "trend", "share", "structure"].includes(type);
 
 const TOOLTIP_STYLE = {
   backgroundColor: "#FFFFFF",
@@ -110,8 +132,9 @@ function renderDashboard(dashboard) {
   let heroUsed = false;
   for (const card of dashboard.cards) {
     if (card.type === "context") {
+      /* Cada dato de contexto es una card propia: label arriba, valor abajo */
       for (const item of card.items) {
-        expanded.push({ type: "context", title: item.label, value: item.value });
+        expanded.push({ type: "context", title: item.label, value: item.value, group: card.group });
       }
     } else if (card.type === "kpi" && !heroUsed) {
       heroUsed = true;
@@ -126,7 +149,7 @@ function renderDashboard(dashboard) {
   let bucket = [];
   const flushBucket = () => {
     if (bucket.length === 0) return;
-    units.push({ kind: "row", items: packRows(bucket) });
+    for (const row of packRows(bucket)) units.push({ kind: "row", items: row.items });
     bucket = [];
   };
 
@@ -143,17 +166,14 @@ function renderDashboard(dashboard) {
 
   const compact = window.matchMedia("(max-width: 940px)").matches;
   if (!compact) {
-    grid.style.gridTemplateRows = units
-      .map((u) => {
-        if (u.kind === "head") return "minmax(30px, auto)";
-        if (u.items.every((it) => it.card.type === "context")) return "auto";
-        const single = u.items.length === 1 ? u.items[0].card.type : null;
-        const weight = Math.max(...u.items.map((it) => ROW_WEIGHT[it.card.type] ?? 1));
-        if (single === "insights") return "minmax(120px, 1fr)";
-        const minHeight = weight >= 3 ? 230 : weight >= 2 ? 180 : 130;
-        return `minmax(${minHeight}px, ${weight}fr)`;
-      })
-      .join(" ");
+    const rows = units.filter((u) => u.kind === "row");
+    const heights = computeRowHeights(rows, availableGridHeight());
+    const tracks = [];
+    for (const u of units) {
+      if (u.kind === "head") tracks.push("auto");
+      else tracks.push(`${heights[rows.indexOf(u)]}px`);
+    }
+    grid.style.gridTemplateRows = tracks.join(" ");
   } else {
     grid.style.gridTemplateRows = "";
   }
@@ -172,6 +192,24 @@ function renderDashboard(dashboard) {
       grid.appendChild(node);
     }
   }
+
+  if (Array.isArray(dashboard.followups) && dashboard.followups.length > 0) {
+    const head = el("div", "section-head");
+    head.appendChild(el("h2", null, "Seguir explorando"));
+    grid.appendChild(head);
+    const wrap = el("div", "followups");
+    for (const q of dashboard.followups.slice(0, 4)) {
+      const chip = el("button", "chip follow-chip", String(q));
+      chip.addEventListener("click", () => send(String(q)));
+      wrap.appendChild(chip);
+    }
+    grid.appendChild(wrap);
+  }
+}
+
+function spanRule(card) {
+  if (card.hero) return { base: 4, max: 4, min: 4 };
+  return SPAN_RULES[card.type] ?? { base: 6, max: 12, min: 6 };
 }
 
 function packRows(cards) {
@@ -187,28 +225,75 @@ function packRows(cards) {
       progress = false;
       for (const item of row) {
         if (leftover === 0) break;
-        const max = (SPAN_RULES[item.card.type] ?? { max: 12 }).max;
-        if (item.span < max) {
+        const rule = spanRule(item.card);
+        if (item.span < rule.max) {
           item.span++;
           leftover--;
           progress = true;
         }
       }
     }
-    rows.push(...row);
+    rows.push({ items: row, used: 12 });
     row = [];
     used = 0;
   };
 
   for (const card of cards) {
-    const rule = SPAN_RULES[card.type] ?? { base: 6, max: 12 };
-    if (row.length > 0 && used + rule.base > 12) closeRow();
+    const rule = spanRule(card);
+    const prevMin = row.reduce((a, it) => a + spanRule(it.card).min, 0);
+    if (row.length > 0 && (used + rule.base > 12 || prevMin + rule.min > 12)) closeRow();
     row.push({ card, span: rule.base });
     used += rule.base;
     if (used === 12) closeRow();
   }
   closeRow();
   return rows;
+}
+
+function computeRowHeights(rows, available) {
+  const heights = rows.map((row) => {
+    let h = 0;
+    for (const it of row.items) h = Math.max(h, naturalHeight(it.card, it.span));
+    if (row.items.every((it) => it.card.type === "context")) {
+      h = Math.max(h, MIN_ROW.context);
+    }
+    if (row.items.every((it) => it.card.type === "kpi")) {
+      h = Math.max(h, MIN_ROW.kpi);
+    }
+    if (row.items.every((it) => it.card.type === "insights")) {
+      h = Math.max(h, MIN_ROW.insights);
+    }
+    return Math.round(h);
+  });
+
+  const total = heights.reduce((a, b) => a + b, 0);
+  const slack = available - total - (rows.length - 1) * 16;
+  if (slack >= 0) return heights;
+
+  /* Solo si no cabe: se comprimen los graficos, nunca la tabla ni los datos */
+  const chartRows = rows
+    .map((row, i) => ({ row, i }))
+    .filter(({ row }) => row.items.some((it) => isAnalysis(it.card.type)));
+  if (chartRows.length === 0) return heights;
+
+  let missing = -slack;
+  const reducible = chartRows.reduce((a, { i }) => a + (heights[i] - MIN_ROW.analysis), 0);
+  if (reducible > 0) {
+    const factor = Math.min(1, missing / reducible);
+    for (const { i } of chartRows) {
+      const cut = Math.round((heights[i] - MIN_ROW.analysis) * factor);
+      heights[i] -= cut;
+      missing -= cut;
+    }
+  }
+  if (missing > 0) {
+    const minTotal = chartRows.reduce((a, { i }) => a + Math.max(MIN_ROW.analysis, heights[i]), 0);
+    if (minTotal > 0) {
+      const factor = Math.min(0.35, missing / minTotal);
+      for (const { i } of chartRows) heights[i] = Math.round(heights[i] * (1 - factor));
+    }
+  }
+  return heights;
 }
 
 function buildCard(card) {
@@ -400,7 +485,7 @@ function buildTrend(node, card) {
           },
         },
         scales: {
-          x: { ticks: { color: "#8E8E93", maxTicksLimit: 12, font: { family: "JetBrains Mono" } }, grid: { display: false } },
+          x: { ticks: { color: "#8E8E93", maxTicksLimit: 8, font: { family: "JetBrains Mono" } }, grid: { display: false } },
           y: {
             title: { display: Boolean(card.unit), text: card.unit, color: "#8E8E93", font: { family: "JetBrains Mono", size: 11 } },
             ticks: { color: "#8E8E93", font: { family: "JetBrains Mono" } },

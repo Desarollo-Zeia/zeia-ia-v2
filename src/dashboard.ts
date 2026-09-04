@@ -12,6 +12,7 @@ export interface Dashboard {
   title: string;
   subtitle?: string;
   cards: Card[];
+  followups?: string[];
 }
 
 const MAX_CARDS = 10;
@@ -23,6 +24,7 @@ const MAX_CONTEXT = 6;
 const MAX_STRUCTURE = 8;
 const MAX_STRUCTURE_POINTS = 12;
 const MAX_INSIGHTS = 6;
+const MAX_FOLLOWUPS = 4;
 
 const str = (v: unknown, max = 200): string =>
   typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -168,9 +170,14 @@ export function validateDashboard(raw: unknown): Dashboard | null {
   if (cards.length === 0) return null;
   const title = str(d.title);
   const subtitle = str(d.subtitle);
+  const followups = (Array.isArray(d.followups) ? d.followups : [])
+    .map((s) => str(s, 120))
+    .filter((s) => s.length >= 4)
+    .slice(0, MAX_FOLLOWUPS);
   return {
     title: title || "Consulta",
     subtitle: subtitle || undefined,
     cards,
+    followups: followups.length > 0 ? followups : undefined,
   };
 }
