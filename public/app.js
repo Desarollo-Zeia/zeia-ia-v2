@@ -1,6 +1,6 @@
 const PALETTE = [
-  "#35e0c8", "#4cc3ff", "#a78bfa", "#ffc857", "#ff6b6b",
-  "#34d399", "#f472b6", "#94a3b8",
+  "#00B7CA", "#2EC4B6", "#4C8DFF", "#FF6B35",
+  "#8B7CF6", "#E71D36", "#F5A524", "#8E8E93",
 ];
 
 const SPAN_RULES = {
@@ -27,12 +27,12 @@ const ROW_WEIGHT = {
 };
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "#101722",
-  borderColor: "#2a3a4e",
+  backgroundColor: "#FFFFFF",
+  borderColor: "#E8E8E3",
   borderWidth: 1,
-  titleColor: "#e8eef5",
-  bodyColor: "#35e0c8",
-  titleFont: { family: "JetBrains Mono", size: 12 },
+  titleColor: "#1C1C1E",
+  bodyColor: "#009EAE",
+  titleFont: { family: "Poppins", size: 12, weight: "600" },
   bodyFont: { family: "JetBrains Mono", size: 12 },
   padding: 10,
   displayColors: false,
@@ -58,6 +58,22 @@ const fmt = (n) =>
 
 const charts = new Map();
 let chartSeq = 0;
+
+let currentView = "admin";
+let lastFindings = null;
+let lastDashboard = null;
+
+function setView(view) {
+  if (view === "admin" && !lastFindings) { loadFindings(); return; }
+  if (view === "analysis" && !lastDashboard) return;
+  currentView = view;
+  document.getElementById("view-panel").classList.toggle("active", view === "admin");
+  const va = document.getElementById("view-analysis");
+  va.classList.toggle("active", view === "analysis");
+  va.disabled = !lastDashboard;
+  if (view === "admin") renderFindingsPanel(lastFindings);
+  else renderDashboard(lastDashboard);
+}
 
 const el = (tag, className, text) => {
   const node = document.createElement(tag);
@@ -85,7 +101,7 @@ function renderMeta(dashboard) {
 function renderDashboard(dashboard) {
   clearDashboard();
   renderMeta(dashboard);
-  setMode("ANÁLISIS DE CONSULTA", "#4cc3ff");
+  setMode("ANÁLISIS DE CONSULTA", "#4D5A63");
   if (!dashboard) return;
   const grid = document.getElementById("cards");
   grid.className = "grid";
@@ -327,11 +343,11 @@ function buildRanking(node, card) {
         },
         scales: {
           x: {
-            title: { display: Boolean(card.unit), text: card.unit, color: "#8a99ab", font: { family: "JetBrains Mono", size: 11 } },
-            ticks: { color: "#8a99ab" },
-            grid: { color: "#1c2735" },
+            title: { display: Boolean(card.unit), text: card.unit, color: "#8E8E93", font: { family: "JetBrains Mono", size: 11 } },
+            ticks: { color: "#8E8E93" },
+            grid: { color: "#E8E8E3" },
           },
-          y: { ticks: { color: "#e8eef5", font: { family: "JetBrains Mono" } }, grid: { display: false } },
+          y: { ticks: { color: "#4D5A63", font: { family: "JetBrains Mono" } }, grid: { display: false } },
         },
       },
     });
@@ -363,8 +379,8 @@ function buildTrend(node, card) {
         labels: card.points.map((p) => fmtDateTime(p.t)),
         datasets: [{
           data: card.points.map((p) => p.v),
-          borderColor: "#35e0c8",
-          backgroundColor: "rgba(53,224,200,.1)",
+          borderColor: "#00B7CA",
+          backgroundColor: "rgba(0,183,202,.12)",
           fill: true,
           tension: 0.3,
           pointRadius: 2,
@@ -384,11 +400,11 @@ function buildTrend(node, card) {
           },
         },
         scales: {
-          x: { ticks: { color: "#8a99ab", maxTicksLimit: 12, font: { family: "JetBrains Mono" } }, grid: { display: false } },
+          x: { ticks: { color: "#8E8E93", maxTicksLimit: 12, font: { family: "JetBrains Mono" } }, grid: { display: false } },
           y: {
-            title: { display: Boolean(card.unit), text: card.unit, color: "#8a99ab", font: { family: "JetBrains Mono", size: 11 } },
-            ticks: { color: "#8a99ab", font: { family: "JetBrains Mono" } },
-            grid: { color: "#1c2735" },
+            title: { display: Boolean(card.unit), text: card.unit, color: "#8E8E93", font: { family: "JetBrains Mono", size: 11 } },
+            ticks: { color: "#8E8E93", font: { family: "JetBrains Mono" } },
+            grid: { color: "#E8E8E3" },
           },
         },
       },
@@ -506,7 +522,6 @@ function md(text) {
 
 function addMsg(role, text, loading) {
   const log = document.getElementById("chat-log");
-  log.hidden = false;
   const msg = el("div", `msg ${role}`);
   if (loading) msg.classList.add("loading");
   if (loading) msg.textContent = text;
@@ -516,6 +531,85 @@ function addMsg(role, text, loading) {
   return msg;
 }
 
+const drawer = document.getElementById("chat-drawer");
+const backdrop = document.getElementById("drawer-backdrop");
+
+function openDrawer() {
+  drawer.classList.add("open");
+  drawer.setAttribute("aria-hidden", "false");
+  backdrop.hidden = false;
+  requestAnimationFrame(() => backdrop.classList.add("open"));
+  document.getElementById("chat-btn").classList.add("active");
+  setTimeout(() => document.getElementById("chat-input").focus(), 300);
+}
+
+function closeDrawer() {
+  drawer.classList.remove("open");
+  drawer.setAttribute("aria-hidden", "true");
+  backdrop.classList.remove("open");
+  document.getElementById("chat-btn").classList.remove("active");
+  setTimeout(() => { backdrop.hidden = true; }, 260);
+}
+
+function addViewNotice() {
+  const log = document.getElementById("chat-log");
+  const msg = el("div", "msg notice");
+  const btn = el("button", "notice-btn", "Ver análisis en el panel");
+  btn.addEventListener("click", closeDrawer);
+  msg.appendChild(btn);
+  log.appendChild(msg);
+  log.scrollTop = log.scrollHeight;
+}
+
+function sectionHeader(text, color, target) {
+  const head = sectionLabel(text, color);
+  const btn = el("button", "adm-toggle");
+  btn.setAttribute("aria-expanded", "true");
+  btn.setAttribute("aria-controls", target);
+  btn.title = "Mostrar / ocultar esta sección";
+  btn.appendChild(el("span", null, "Ocultar"));
+  btn.appendChild(el("span", "chev", "▾"));
+  btn.addEventListener("click", () => {
+    const grid = document.getElementById(target);
+    if (!grid) return;
+    const collapsed = grid.classList.toggle("collapsed");
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    btn.firstChild.textContent = collapsed ? "Mostrar" : "Ocultar";
+  });
+  head.appendChild(btn);
+  return head;
+}
+
+function renderSkeleton() {
+  clearDashboard();
+  const root = document.getElementById("cards");
+  root.className = "adm";
+  root.style.gridTemplateRows = "";
+  document.getElementById("empty-state").hidden = true;
+  const hero = el("div", "adm-hero");
+  for (let i = 0; i < 3; i++) {
+    const item = el("div", "adm-hero-item");
+    item.appendChild(el("div", "sk-line sk-w40"));
+    item.appendChild(el("div", "sk-line sk-w80"));
+    item.appendChild(el("div", "sk-line sk-w60"));
+    hero.appendChild(item);
+  }
+  root.appendChild(hero);
+  const sections = [["Acciones requeridas", 2], ["Vigilar", 3]];
+  for (const [title, n] of sections) {
+    root.appendChild(sectionLabel(title, "#E8E8E3"));
+    const grid = el("div", "adm-cards");
+    for (let i = 0; i < n; i++) {
+      const c = el("section", "adm-card");
+      c.appendChild(el("div", "sk-line sk-w30"));
+      c.appendChild(el("div", "sk-line sk-w90"));
+      c.appendChild(el("div", "sk-line sk-w100"));
+      c.appendChild(el("div", "sk-line sk-w70"));
+      grid.appendChild(c);
+    }
+    root.appendChild(grid);
+  }
+}
 function setMode(label, color) {
   const badge = document.getElementById("mode-badge");
   if (!badge) return;
@@ -528,7 +622,10 @@ async function loadFindings() {
   const grid = document.getElementById("cards");
   const empty = document.getElementById("empty-state");
   const meta = document.getElementById("dash-meta");
-  setMode("CARGANDO PANEL", "#8a99ab");
+  setMode("CARGANDO PANEL", "#8E8E93");
+  clearDashboard();
+  meta.innerHTML = "";
+  renderSkeleton();
   try {
     const res = await fetch("/findings");
     if (!res.ok) {
@@ -545,11 +642,14 @@ async function loadFindings() {
       errCard.appendChild(el("p", "finding-detail", detail));
       errCard.appendChild(el("p", "finding-detail", "Mientras tanto puedes preguntarle a ZeIA en el chat de abajo."));
       grid.appendChild(errCard);
-      setMode("SIN PANEL", "#ff6b6b");
+      setMode("SIN PANEL", "#E71D36");
       return;
     }
     const data = await res.json();
-    if (data && data.findings) renderFindingsPanel(data);
+    if (data && data.findings) {
+      lastFindings = data;
+      setView("admin");
+    }
   } catch (err) {
     clearDashboard();
     empty.hidden = true;
@@ -557,8 +657,45 @@ async function loadFindings() {
     errCard.appendChild(el("h3", "finding-title", "No pude contactar al servidor"));
     errCard.appendChild(el("p", "finding-detail", String(err)));
     grid.appendChild(errCard);
-    setMode("SIN CONEXION", "#ff6b6b");
+    setMode("SIN CONEXION", "#E71D36");
   }
+}
+
+function buildGauge(score, grade) {
+  const colors = { ok: "#2EC4B6", warning: "#FF6B35", critical: "#E71D36" };
+  const color = colors[grade] ?? "#00B7CA";
+  const clamped = Math.max(0, Math.min(100, Number(score) || 0));
+  const R = 34;
+  const C = 2 * Math.PI * R;
+  const wrap = el("div", "gauge");
+  wrap.title = `Salud de la instalación: ${clamped} de 100. Resta 25 por hallazgo crítico, 10 por advertencia y 3 por vigilancia.`;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 84 84");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Estado ${clamped} de 100`);
+  const track = document.createElementNS(NS, "circle");
+  track.setAttribute("cx", "42");
+  track.setAttribute("cy", "42");
+  track.setAttribute("r", String(R));
+  track.setAttribute("class", "gauge-track");
+  const val = document.createElementNS(NS, "circle");
+  val.setAttribute("cx", "42");
+  val.setAttribute("cy", "42");
+  val.setAttribute("r", String(R));
+  val.setAttribute("class", "gauge-val");
+  val.setAttribute("stroke", color);
+  val.setAttribute("stroke-dasharray", C.toFixed(1));
+  val.setAttribute("stroke-dashoffset", (C * (1 - clamped / 100)).toFixed(1));
+  svg.appendChild(track);
+  svg.appendChild(val);
+  const num = el("div", "gauge-num");
+  const big = el("span", null, String(clamped));
+  big.appendChild(el("small", null, "/100"));
+  num.appendChild(big);
+  wrap.appendChild(svg);
+  wrap.appendChild(num);
+  return wrap;
 }
 
 function renderFindingsPanel(a) {
@@ -566,7 +703,7 @@ function renderFindingsPanel(a) {
   const root = document.getElementById("cards");
   root.className = "adm";
   root.style.gridTemplateRows = "";
-  setMode("MODO ADMINISTRADOR", "#35e0c8");
+  setMode("MODO ADMINISTRADOR", "#009EAE");
   const meta = document.getElementById("dash-meta");
   meta.innerHTML = "";
   meta.appendChild(el("h2", null, "Modo Administrador"));
@@ -582,8 +719,7 @@ function renderFindingsPanel(a) {
   const scoreBlock = el("div", "adm-hero-item adm-hero-item--score");
   scoreBlock.appendChild(el("div", "adm-label", "Estado de la instalación"));
   const scoreLine = el("div", "adm-score-line");
-  scoreLine.appendChild(el("span", `adm-score adm-score--${gradeMeta[1]}`, String(a.score)));
-  scoreLine.appendChild(el("span", "adm-score-den", "/ 100"));
+  scoreLine.appendChild(buildGauge(a.score, a.grade));
   scoreLine.appendChild(el("span", `adm-grade adm-grade--${gradeMeta[1]}`, gradeMeta[0]));
   scoreBlock.appendChild(scoreLine);
   hero.appendChild(scoreBlock);
@@ -615,15 +751,21 @@ function renderFindingsPanel(a) {
     ...a.findings.filter((f) => f.severity === "warning"),
   ];
   if (acciones.length > 0) {
-    root.appendChild(sectionLabel("Acciones requeridas", "#ff6b6b"));
-    acciones.forEach((f, i) => root.appendChild(buildActionRow(f, i)));
+    root.appendChild(sectionHeader("Acciones requeridas", "#E71D36", "sec-acciones"));
+    const grid = el("div", "adm-cards");
+    grid.id = "sec-acciones";
+    acciones.forEach((f, i) => grid.appendChild(buildFindingCard(f, i)));
+    root.appendChild(grid);
   }
 
-  /* 3. Vigilar: filas compactas */
+  /* 3. Vigilar: grilla de cards */
   const vigilar = a.findings.filter((f) => f.severity === "info");
   if (vigilar.length > 0) {
-    root.appendChild(sectionLabel("Vigilar", "#4cc3ff"));
-    for (const f of vigilar) root.appendChild(buildWatchRow(f));
+    root.appendChild(sectionHeader("Vigilar", "#00B7CA", "sec-vigilar"));
+    const grid = el("div", "adm-cards");
+    grid.id = "sec-vigilar";
+    for (const f of vigilar) grid.appendChild(buildFindingCard(f, null));
+    root.appendChild(grid);
   }
 
   /* 4. En orden: franja final discreta */
@@ -662,37 +804,24 @@ function moneyNode(amount) {
   return wrap;
 }
 
-function buildActionRow(f, i) {
-  const row = el("section", `adm-row adm-row--${f.severity}`);
-  row.appendChild(el("span", "adm-rank", String(i + 1).padStart(2, "0")));
-  const main = el("div", "adm-main");
-  const titleLine = el("div", "adm-title-line");
-  titleLine.appendChild(el("h3", "adm-title", f.title));
-  titleLine.appendChild(el("span", "adm-asset", f.asset));
-  main.appendChild(titleLine);
-  main.appendChild(el("p", "adm-detail", f.detail));
-  row.appendChild(main);
-  row.appendChild(moneyNode(f.money_impact));
+function buildFindingCard(f, i) {
+  const card = el("article", `adm-card adm-card--${f.severity}`);
+  const head = el("div", "adm-card-head");
+  if (f.asset) head.appendChild(el("div", "adm-kicker", f.asset));
+  if (i != null) head.appendChild(el("span", "adm-rank", String(i + 1).padStart(2, "0")));
+  card.appendChild(head);
+  card.appendChild(el("h3", "adm-title", f.title));
+  card.appendChild(el("p", "adm-detail", f.detail));
+  const foot = el("div", "adm-card-foot");
+  const moneyBlock = el("div", "adm-money-block");
+  moneyBlock.appendChild(el("div", "adm-money-label", "Impacto mensual"));
+  moneyBlock.appendChild(moneyNode(f.money_impact));
+  foot.appendChild(moneyBlock);
   const btn = el("button", "analyze-btn", "Analizar con ZeIA");
   btn.addEventListener("click", () => send(f.suggested_question));
-  row.appendChild(btn);
-  return row;
-}
-
-function buildWatchRow(f) {
-  const row = el("section", `adm-row adm-row--watch adm-row--${f.severity}`);
-  const main = el("div", "adm-main");
-  const titleLine = el("div", "adm-title-line");
-  titleLine.appendChild(el("h3", "adm-title", f.title));
-  titleLine.appendChild(el("span", "adm-asset", f.asset));
-  main.appendChild(titleLine);
-  main.appendChild(el("p", "adm-detail", f.detail));
-  row.appendChild(main);
-  row.appendChild(moneyNode(f.money_impact));
-  const btn = el("button", "analyze-btn", "Analizar con ZeIA");
-  btn.addEventListener("click", () => send(f.suggested_question));
-  row.appendChild(btn);
-  return row;
+  foot.appendChild(btn);
+  card.appendChild(foot);
+  return card;
 }
 
 async function send(text) {
@@ -700,6 +829,7 @@ async function send(text) {
   const button = document.getElementById("chat-send");
   if (!text.trim() || button.disabled) return;
 
+  openDrawer();
   addMsg("user", text);
   input.value = "";
   button.disabled = true;
@@ -717,7 +847,11 @@ async function send(text) {
       addMsg("assistant", `Error: ${data.error}`);
     } else {
       addMsg("assistant", data.reply || "(sin respuesta)");
-      renderDashboard(data.dashboard ?? null);
+      if (data.dashboard) {
+        lastDashboard = data.dashboard;
+        setView("analysis");
+        addViewNotice();
+      }
     }
   } catch (err) {
     pending.remove();
@@ -737,6 +871,19 @@ document.querySelectorAll(".suggestions .chip").forEach((chip) => {
   chip.addEventListener("click", () => send(chip.textContent));
 });
 
-document.getElementById("admin-btn").addEventListener("click", () => loadFindings());
+document.getElementById("chat-btn").addEventListener("click", () => {
+  drawer.classList.contains("open") ? closeDrawer() : openDrawer();
+});
+document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+backdrop.addEventListener("click", closeDrawer);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+});
+
+document.getElementById("view-panel").addEventListener("click", () => {
+  if (currentView === "admin") loadFindings();
+  else setView("admin");
+});
+document.getElementById("view-analysis").addEventListener("click", () => setView("analysis"));
 
 loadFindings();

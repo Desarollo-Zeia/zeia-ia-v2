@@ -6,6 +6,7 @@
   <title>ZeIA — Monitoreo de energía</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -20,12 +21,16 @@
     <div id="dash-meta" class="dash-meta"></div>
     <div class="topbar-actions">
       <span id="mode-badge" class="mode-badge">CARGANDO</span>
-      <button id="admin-btn" class="admin-btn" title="Volver al panel del administrador">Panel</button>
+      <div class="view-switch" role="tablist" aria-label="Vista">
+        <button id="view-panel" class="view-btn active" role="tab" title="Panel del administrador (clic de nuevo para actualizar)">Panel</button>
+        <button id="view-analysis" class="view-btn" role="tab" disabled title="Último análisis del chat">Análisis</button>
+      </div>
+      <button id="chat-btn" class="admin-btn" title="Abrir chat con ZeIA">Chat</button>
     </div>
   </header>
 
   <main id="dashboard" class="dashboard">
-    <div id="empty-state" class="empty-state">
+    <div id="empty-state" class="empty-state" hidden>
       <h2>¿Qué quieres saber?</h2>
       <p>Pregunta por consumo, comparaciones o estado de tus puntos de medición.</p>
       <div class="suggestions">
@@ -40,14 +45,23 @@
     <div id="cards" class="cards"></div>
   </main>
 
-  <footer class="chatbar">
-    <div id="chat-log" class="chat-log" hidden></div>
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+
+  <aside id="chat-drawer" class="chat-drawer" aria-hidden="true">
+    <header class="drawer-head">
+      <div>
+        <h2>Chat con ZeIA</h2>
+        <p>Pregunta por consumo, alertas o comparaciones</p>
+      </div>
+      <button id="drawer-close" class="drawer-close" title="Cerrar chat">&times;</button>
+    </header>
+    <div id="chat-log" class="chat-log"></div>
     <form id="chat-form" class="chat-form">
       <input id="chat-input" type="text" autocomplete="off"
         placeholder="Pregunta por consumo, comparaciones, alertas..." />
       <button type="submit" id="chat-send">Enviar</button>
     </form>
-  </footer>
+  </aside>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="/app.js"></script>
