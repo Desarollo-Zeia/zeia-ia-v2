@@ -4,12 +4,26 @@ const PALETTE = [
 ];
 
 const SPAN_RULES = {
-  kpi: { base: 3, max: 4 },
-  context: { base: 3, max: 4 },
-  share: { base: 4, max: 5 },
-  ranking: { base: 6, max: 8 },
-  trend: { base: 6, max: 8 },
+  kpi: { base: 3, max: 6 },
+  context: { base: 3, max: 6 },
+  share: { base: 4, max: 6 },
+  ranking: { base: 6, max: 12 },
+  trend: { base: 6, max: 12 },
   table: { base: 6, max: 12 },
+  structure: { base: 6, max: 12 },
+  insights: { base: 12, max: 12 },
+};
+
+const ROW_WEIGHT = {
+  kpi: 1,
+  context: 0,
+  "context-strip": 0,
+  share: 3,
+  ranking: 3,
+  trend: 3,
+  table: 2,
+  structure: 3,
+  insights: 1,
 };
 
 const TOOLTIP_STYLE = {
@@ -71,48 +85,77 @@ function renderMeta(dashboard) {
 function renderDashboard(dashboard) {
   clearDashboard();
   renderMeta(dashboard);
+  setMode("ANÁLISIS DE CONSULTA", "#4cc3ff");
   if (!dashboard) return;
   const grid = document.getElementById("cards");
   grid.className = "grid";
 
   const expanded = [];
+  let heroUsed = false;
   for (const card of dashboard.cards) {
     if (card.type === "context") {
       for (const item of card.items) {
-        expanded.push({ ...card, title: item.label, value: item.value });
+        expanded.push({ type: "context", title: item.label, value: item.value });
       }
+    } else if (card.type === "kpi" && !heroUsed) {
+      heroUsed = true;
+      expanded.push({ ...card, hero: true });
     } else {
       expanded.push(card);
     }
   }
 
+  const units = [];
   let currentGroup = null;
-  let sectionCards = [];
-
-  const flushSection = () => {
-    for (const item of packRows(sectionCards)) {
-      const node = buildCard(item.card);
-      if (!node) continue;
-      node.classList.add(`s${item.span}`);
-      grid.appendChild(node);
-    }
-    sectionCards = [];
+  let bucket = [];
+  const flushBucket = () => {
+    if (bucket.length === 0) return;
+    units.push({ kind: "row", items: packRows(bucket) });
+    bucket = [];
   };
 
   for (const card of expanded) {
     const group = card.group ?? "";
     if (group !== currentGroup) {
-      flushSection();
+      flushBucket();
       currentGroup = group;
-      if (group) {
-        const head = el("div", "section-head");
-        head.appendChild(el("h2", null, group));
-        grid.appendChild(head);
-      }
+      if (group) units.push({ kind: "head", title: group });
     }
-    sectionCards.push(card);
+    bucket.push(card);
   }
-  flushSection();
+  flushBucket();
+
+  const compact = window.matchMedia("(max-width: 940px)").matches;
+  if (!compact) {
+    grid.style.gridTemplateRows = units
+      .map((u) => {
+        if (u.kind === "head") return "minmax(30px, auto)";
+        if (u.items.every((it) => it.card.type === "context")) return "auto";
+        const single = u.items.length === 1 ? u.items[0].card.type : null;
+        const weight = Math.max(...u.items.map((it) => ROW_WEIGHT[it.card.type] ?? 1));
+        if (single === "insights") return "minmax(120px, 1fr)";
+        const minHeight = weight >= 3 ? 230 : weight >= 2 ? 180 : 130;
+        return `minmax(${minHeight}px, ${weight}fr)`;
+      })
+      .join(" ");
+  } else {
+    grid.style.gridTemplateRows = "";
+  }
+
+  for (const u of units) {
+    if (u.kind === "head") {
+      const head = el("div", "section-head");
+      head.appendChild(el("h2", null, u.title));
+      grid.appendChild(head);
+      continue;
+    }
+    for (const item of u.items) {
+      const node = buildCard(item.card);
+      if (!node) continue;
+      node.classList.add(`s${item.span}`);
+      grid.appendChild(node);
+    }
+  }
 }
 
 function packRows(cards) {
@@ -154,6 +197,7 @@ function packRows(cards) {
 
 function buildCard(card) {
   const node = el("section", `card card--${card.type}`);
+  if (card.hero) node.classList.add("card--hero");
   switch (card.type) {
     case "kpi": return buildKpi(node, card);
     case "share": return buildShare(node, card);
@@ -161,6 +205,9 @@ function buildCard(card) {
     case "trend": return buildTrend(node, card);
     case "table": return buildTable(node, card);
     case "context": return buildContext(node, card);
+    case "context-strip": return buildContextStrip(node, card);
+    case "structure": return buildStructure(node, card);
+    case "insights": return buildInsights(node, card);
     default: return null;
   }
 }
@@ -263,18 +310,27 @@ function buildRanking(node, card) {
         indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        interaction: { intersect: false, mode: "index" },
+        interaction: { mode: "nearest", intersect: true },
         plugins: {
           legend: { display: false },
           tooltip: {
             ...TOOLTIP_STYLE,
             callbacks: {
-              label: (ctx) => ` ${fmt(ctx.parsed.x)} ${card.unit}`,
+              title: (items) => items[0]?.label ?? "",
+              label: (ctx) => {
+                const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                const pct = total ? ((ctx.parsed.x / total) * 100).toFixed(1) : 0;
+                return ` ${fmt(ctx.parsed.x)} ${card.unit} (${pct}% del total)`;
+              },
             },
           },
         },
         scales: {
-          x: { ticks: { color: "#8a99ab" }, grid: { color: "#1c2735" } },
+          x: {
+            title: { display: Boolean(card.unit), text: card.unit, color: "#8a99ab", font: { family: "JetBrains Mono", size: 11 } },
+            ticks: { color: "#8a99ab" },
+            grid: { color: "#1c2735" },
+          },
           y: { ticks: { color: "#e8eef5", font: { family: "JetBrains Mono" } }, grid: { display: false } },
         },
       },
@@ -329,7 +385,11 @@ function buildTrend(node, card) {
         },
         scales: {
           x: { ticks: { color: "#8a99ab", maxTicksLimit: 12, font: { family: "JetBrains Mono" } }, grid: { display: false } },
-          y: { ticks: { color: "#8a99ab", font: { family: "JetBrains Mono" } }, grid: { color: "#1c2735" } },
+          y: {
+            title: { display: Boolean(card.unit), text: card.unit, color: "#8a99ab", font: { family: "JetBrains Mono", size: 11 } },
+            ticks: { color: "#8a99ab", font: { family: "JetBrains Mono" } },
+            grid: { color: "#1c2735" },
+          },
         },
       },
     });
@@ -374,14 +434,265 @@ function buildContext(node, card) {
   return node;
 }
 
+function buildContextStrip(node, card) {
+  node.classList.add("card--context");
+  const wrap = el("div", "context-strip");
+  for (const item of card.items) {
+    const chip = el("div", "context-chip");
+    chip.appendChild(el("span", "context-label", item.label));
+    chip.appendChild(el("span", "context-value-sm", fmtDateTime(item.value)));
+    wrap.appendChild(chip);
+  }
+  node.appendChild(wrap);
+  return node;
+}
+
+function buildStructure(node, card) {
+  node.appendChild(el("h3", null, card.title));
+  const list = el("div", "structure-list");
+  card.items.forEach((item, idx) => {
+    const panel = el("div", "structure-panel");
+    const color = PALETTE[idx % PALETTE.length];
+    panel.style.setProperty("--panel-accent", color);
+
+    const head = el("div", "structure-head");
+    const name = el("span", "structure-name", item.label);
+    name.title = item.label;
+    head.appendChild(name);
+    if (item.value) head.appendChild(el("span", "structure-badge", item.value));
+    panel.appendChild(head);
+
+    if (item.points && item.points.length > 0) {
+      const chips = el("div", "structure-points");
+      for (const point of item.points.slice(0, 12)) {
+        const chip = el("span", "point-chip", point);
+        chip.title = point;
+        chips.appendChild(chip);
+      }
+      panel.appendChild(chips);
+    }
+    list.appendChild(panel);
+  });
+  node.appendChild(list);
+  return node;
+}
+
+function buildInsights(node, card) {
+  node.appendChild(el("h3", null, card.title));
+  const list = el("ul", "insight-list");
+  for (const text of card.items) {
+    const li = el("li", null, text);
+    list.appendChild(li);
+  }
+  node.appendChild(list);
+  return node;
+}
+
+function md(text) {
+  const escape = (s) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const lines = String(text).split("\n").map((line) => {
+    const heading = /^#{1,6}\s+(.*)$/.exec(line.trim());
+    const content = heading ? heading[1] : line;
+    const formatted = escape(content)
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, '<span class="mono">$1</span>');
+    if (heading) return `<div class="md-h">${formatted}</div>`;
+    if (/^\s*[-*•]\s+/.test(line)) return `<div class="md-li">${formatted.replace(/^\s*[-*•]\s+/, "• ")}</div>`;
+    return `<div>${formatted}</div>`;
+  });
+  return lines.join("");
+}
+
 function addMsg(role, text, loading) {
   const log = document.getElementById("chat-log");
   log.hidden = false;
-  const msg = el("div", `msg ${role}`, text);
+  const msg = el("div", `msg ${role}`);
   if (loading) msg.classList.add("loading");
+  if (loading) msg.textContent = text;
+  else msg.innerHTML = md(text);
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
   return msg;
+}
+
+function setMode(label, color) {
+  const badge = document.getElementById("mode-badge");
+  if (!badge) return;
+  badge.textContent = label;
+  badge.style.color = color;
+  badge.style.borderColor = color;
+}
+
+async function loadFindings() {
+  const grid = document.getElementById("cards");
+  const empty = document.getElementById("empty-state");
+  const meta = document.getElementById("dash-meta");
+  setMode("CARGANDO PANEL", "#8a99ab");
+  try {
+    const res = await fetch("/findings");
+    if (!res.ok) {
+      const detail = res.status === 404
+        ? "El servidor no tiene el endpoint /findings. Reinicia el server (bun run server) para cargar la version actual."
+        : `El server respondio ${res.status} al pedir el panel.`;
+      clearDashboard();
+      empty.hidden = true;
+      meta.innerHTML = "";
+      meta.appendChild(el("h2", null, "Modo Administrador"));
+      meta.appendChild(el("p", null, "No disponible"));
+      const errCard = el("section", "card finding finding--critical");
+      errCard.appendChild(el("h3", "finding-title", "Panel del administrador no disponible"));
+      errCard.appendChild(el("p", "finding-detail", detail));
+      errCard.appendChild(el("p", "finding-detail", "Mientras tanto puedes preguntarle a ZeIA en el chat de abajo."));
+      grid.appendChild(errCard);
+      setMode("SIN PANEL", "#ff6b6b");
+      return;
+    }
+    const data = await res.json();
+    if (data && data.findings) renderFindingsPanel(data);
+  } catch (err) {
+    clearDashboard();
+    empty.hidden = true;
+    const errCard = el("section", "card finding finding--critical");
+    errCard.appendChild(el("h3", "finding-title", "No pude contactar al servidor"));
+    errCard.appendChild(el("p", "finding-detail", String(err)));
+    grid.appendChild(errCard);
+    setMode("SIN CONEXION", "#ff6b6b");
+  }
+}
+
+function renderFindingsPanel(a) {
+  clearDashboard();
+  const root = document.getElementById("cards");
+  root.className = "adm";
+  root.style.gridTemplateRows = "";
+  setMode("MODO ADMINISTRADOR", "#35e0c8");
+  const meta = document.getElementById("dash-meta");
+  meta.innerHTML = "";
+  meta.appendChild(el("h2", null, "Modo Administrador"));
+  meta.appendChild(el("p", null, `Actualizado ${a.generated_at.slice(11, 16)}`));
+  document.getElementById("empty-state").hidden = true;
+
+  const counts = { critical: 0, warning: 0, info: 0 };
+  for (const f of a.findings) counts[f.severity]++;
+
+  /* 1. Estado: una franja, tres datos, cero decoracion */
+  const gradeMeta = { ok: ["Operativo", "ok"], warning: ["Atención", "warning"], critical: ["Crítico", "critical"] }[a.grade];
+  const hero = el("div", "adm-hero");
+  const scoreBlock = el("div", "adm-hero-item adm-hero-item--score");
+  scoreBlock.appendChild(el("div", "adm-label", "Estado de la instalación"));
+  const scoreLine = el("div", "adm-score-line");
+  scoreLine.appendChild(el("span", `adm-score adm-score--${gradeMeta[1]}`, String(a.score)));
+  scoreLine.appendChild(el("span", "adm-score-den", "/ 100"));
+  scoreLine.appendChild(el("span", `adm-grade adm-grade--${gradeMeta[1]}`, gradeMeta[0]));
+  scoreBlock.appendChild(scoreLine);
+  hero.appendChild(scoreBlock);
+
+  if (a.cost) {
+    const costBlock = el("div", "adm-hero-item");
+    costBlock.appendChild(el("div", "adm-label", "Costo de energía · 30 días"));
+    const costLine = el("div", "adm-score-line");
+    costLine.appendChild(el("span", "adm-cost", fmt(a.cost.total_cost)));
+    costLine.appendChild(el("span", "adm-cost-cur", a.cost.currency));
+    costBlock.appendChild(costLine);
+    costBlock.appendChild(el("div", "adm-sub", `${fmt(a.cost.energy_kwh ?? 0)} kWh · pico ${fmt(a.cost.max_demand_kw_peak ?? 0)} kW`));
+    hero.appendChild(costBlock);
+  }
+
+  const countBlock = el("div", "adm-hero-item");
+  countBlock.appendChild(el("div", "adm-label", "Hallazgos"));
+  const countLines = el("div", "adm-counts");
+  countLines.appendChild(el("div", "fc fc--critical", `${counts.critical} requieren acción`));
+  countLines.appendChild(el("div", "fc fc--warning", `${counts.warning} en atención`));
+  countLines.appendChild(el("div", "fc fc--info", `${counts.info} en vigilancia`));
+  countBlock.appendChild(countLines);
+  hero.appendChild(countBlock);
+  root.appendChild(hero);
+
+  /* 2. Acciones requeridas: critical + warning como cola priorizada */
+  const acciones = [
+    ...a.findings.filter((f) => f.severity === "critical"),
+    ...a.findings.filter((f) => f.severity === "warning"),
+  ];
+  if (acciones.length > 0) {
+    root.appendChild(sectionLabel("Acciones requeridas", "#ff6b6b"));
+    acciones.forEach((f, i) => root.appendChild(buildActionRow(f, i)));
+  }
+
+  /* 3. Vigilar: filas compactas */
+  const vigilar = a.findings.filter((f) => f.severity === "info");
+  if (vigilar.length > 0) {
+    root.appendChild(sectionLabel("Vigilar", "#4cc3ff"));
+    for (const f of vigilar) root.appendChild(buildWatchRow(f));
+  }
+
+  /* 4. En orden: franja final discreta */
+  if (a.ok_summary && a.ok_summary.length > 0) {
+    const ok = el("div", "adm-ok");
+    const list = el("ul");
+    for (const t of a.ok_summary) list.appendChild(el("li", null, t));
+    ok.appendChild(el("span", "adm-ok-title", "En orden"));
+    ok.appendChild(list);
+    root.appendChild(ok);
+  }
+}
+
+function sectionLabel(text, color) {
+  const head = el("div", "adm-section");
+  const bar = el("span", "adm-section-bar");
+  bar.style.background = color;
+  head.appendChild(bar);
+  head.appendChild(el("h2", null, text));
+  return head;
+}
+
+function moneyNode(amount) {
+  const wrap = el("div", "adm-money");
+  if (amount == null) {
+    wrap.classList.add("adm-money--na");
+    wrap.textContent = "—";
+    return wrap;
+  }
+  if (amount < 0) {
+    wrap.classList.add("adm-money--save");
+    wrap.innerHTML = `${fmt(Math.abs(amount))} <small>USD/mes de ahorro</small>`;
+  } else {
+    wrap.innerHTML = `${fmt(amount)} <small>USD/mes</small>`;
+  }
+  return wrap;
+}
+
+function buildActionRow(f, i) {
+  const row = el("section", `adm-row adm-row--${f.severity}`);
+  row.appendChild(el("span", "adm-rank", String(i + 1).padStart(2, "0")));
+  const main = el("div", "adm-main");
+  const titleLine = el("div", "adm-title-line");
+  titleLine.appendChild(el("h3", "adm-title", f.title));
+  titleLine.appendChild(el("span", "adm-asset", f.asset));
+  main.appendChild(titleLine);
+  main.appendChild(el("p", "adm-detail", f.detail));
+  row.appendChild(main);
+  row.appendChild(moneyNode(f.money_impact));
+  const btn = el("button", "analyze-btn", "Analizar con ZeIA");
+  btn.addEventListener("click", () => send(f.suggested_question));
+  row.appendChild(btn);
+  return row;
+}
+
+function buildWatchRow(f) {
+  const row = el("section", `adm-row adm-row--watch adm-row--${f.severity}`);
+  const main = el("div", "adm-main");
+  const titleLine = el("div", "adm-title-line");
+  titleLine.appendChild(el("h3", "adm-title", f.title));
+  titleLine.appendChild(el("span", "adm-asset", f.asset));
+  main.appendChild(titleLine);
+  main.appendChild(el("p", "adm-detail", f.detail));
+  row.appendChild(main);
+  row.appendChild(moneyNode(f.money_impact));
+  const btn = el("button", "analyze-btn", "Analizar con ZeIA");
+  btn.addEventListener("click", () => send(f.suggested_question));
+  row.appendChild(btn);
+  return row;
 }
 
 async function send(text) {
@@ -425,3 +736,7 @@ document.getElementById("chat-form").addEventListener("submit", (e) => {
 document.querySelectorAll(".suggestions .chip").forEach((chip) => {
   chip.addEventListener("click", () => send(chip.textContent));
 });
+
+document.getElementById("admin-btn").addEventListener("click", () => loadFindings());
+
+loadFindings();

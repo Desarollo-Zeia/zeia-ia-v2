@@ -211,13 +211,15 @@ export const CLIENT_TERMS = {
   energia: {
     keys: ["EPpos", "EPneg"],
     columns: ["EPpos_value", "EPneg_value"],
-    meaning: "Energía activa consumida/generada (kWh, contador acumulado)",
+    meaning:
+      "Energía activa consumida/generada (kWh); EPpos es un contador acumulativo que puede reiniciarse",
     tool: "energy_consumption",
   },
   consumo: {
     keys: ["EPpos", "EPneg"],
     columns: ["EPpos_value", "EPneg_value"],
-    meaning: "Energía activa (kWh); el consumo se calcula como diferencia de contador EPpos",
+    meaning:
+      "Energía activa (kWh); el consumo lo calcula energy_consumption integrando la potencia normalizada por hora (robusto ante reinicios del contador EPpos)",
     tool: "energy_consumption",
   },
   potencia: {
@@ -257,3 +259,24 @@ export const CLIENT_TERMS = {
     tool: "latest_metrics|reading_history",
   },
 } as const;
+
+export function agentDataNotes(): string {
+  const vocab = Object.entries(CLIENT_TERMS)
+    .map(([term, v]) => `"${term}" = ${v.keys.join("/")} (${v.meaning})`)
+    .join("; ");
+
+  const thd = Object.entries(READINGS_READING_MAP)
+    .filter(([key]) => key.startsWith("THD"))
+    .map(([key, v]) => `${key} = ${v.column.replace("_value", "")}`)
+    .join(", ");
+
+  const unmapped = Object.keys(ELECTRIC_PARAMETERS).filter(
+    (key) => !(key in READINGS_READING_MAP)
+  );
+
+  return [
+    `Vocabulario del cliente -> parametros: ${vocab}.`,
+    `Equivalencias web = BD: ${thd}. Las fases de la BD a/b/c se muestran al cliente como R/S/T (a=R, b=S, c=T); nunca inventes otra equivalencia.`,
+    `Parametros sin dato por punto en la BD (si el cliente los pide, aclara que no se publican y ofrece el total): ${unmapped.join(", ")}.`,
+  ].join(" ");
+}

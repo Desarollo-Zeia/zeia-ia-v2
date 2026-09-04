@@ -7,12 +7,14 @@ Cómo ZeIA convierte una pregunta del cliente en un dashboard. Catálogo **cerra
 1. Máximo **10 cards** por respuesta, mínimo 3 si hubo consulta de datos. Si sobra espacio, no se rellena.
 2. **Paridad texto-dashboard**: todo dato, ranking o conclusión del texto debe existir como card; nada relevante queda solo en el texto.
 3. Todo número viene de una herramienta. Lo único calculable en el cliente: diferencias y porcentajes entre esos datos.
-4. Toda cantidad lleva unidad (`kWh`, `kW`, `V`, `A`, `%`, `Hz`). Sin unidad, no se muestra.
-5. Sin datos → no hay card; se explica en el texto del chat.
+4. Toda cantidad lleva unidad (`kWh`, `kW`, `V`, `A`, `%`, `Hz`, `USD/MWh`). Sin unidad, no se muestra: en kpi/share/ranking/trend via `unit`; en `table` en el encabezado de columna; en `context` dentro del value.
+5. Sin datos → no hay card numérica; se explica en el texto del chat (con fecha de última lectura si aplica).
 6. El cliente se acostumbra a una forma: el mismo tipo de pregunta genera siempre el mismo layout.
-7. Los gráficos siempre con tooltip al hover (valor + unidad + %).
+7. Los gráficos siempre con tooltip al hover (valor + unidad + %), y los ejes rotulados con la unidad.
+8. **Toda respuesta que consultó herramientas se grafica** — incluidas las estructurales (tableros/puntos/sedes) con la card `structure`.
+9. **Toda respuesta con datos termina con una card `insights`**: el análisis del asistente para el cliente (1-5 frases basadas solo en datos).
 
-## Catálogo de cards (6 tipos)
+## Catálogo de cards (8 tipos)
 
 | Tipo | Uso | Límites |
 |---|---|---|
@@ -21,7 +23,9 @@ Cómo ZeIA convierte una pregunta del cliente en un dashboard. Catálogo **cerra
 | `ranking` | Comparación ordenada entre puntos (barras horizontales). Responde "¿quién consume más?" | ≤ 8 items |
 | `trend` | Evolución temporal (línea). Responde "¿cómo fue a lo largo de...?" | ≤ 60 puntos |
 | `table` | Detalle multi-atributo (punto, tablero, sede, valor). | ≤ 6 columnas, ≤ 12 filas |
-| `context` | Dato del sujeto: cada chip se renderiza como **card independiente** (base 3, acento teal). Van primero. Última lectura, sede, tablero, etc. | ≤ 6 chips |
+| `context` | Datos del sujeto (sede, moneda, última lectura, periodo): se renderizan como **un strip compacto de una línea** al final, antes de `insights`. Son información adicional, no protagonistas. | ≤ 6 chips |
+| `structure` | Jerarquía tablero → puntos de monitoreo: cada tablero con su badge de conteo ("9 puntos de monitoreo activos") y sus puntos como chips. | ≤ 8 tableros, ≤ 12 puntos c/u |
+| `insights` | Apartado de **análisis del asistente**: frases con lo que el cliente debe tomar en cuenta (anomalías, comparaciones, advertencias de datos, recomendaciones). Ancho completo, va al final. | ≤ 6 frases |
 
 Todas las cards aceptan `group` (opcional): cards con el mismo `group` se agrupan bajo un título de sección (ej: "Alertas más importantes" para un trío de kpi). Cards sin `group` van sueltas al inicio.
 
@@ -39,7 +43,13 @@ Todas las cards aceptan `group` (opcional): cards con el mismo `group` se agrupa
 - Nada de donuts con más de 8 categorías: agrupar en "Otros" o usar `table`.
 - **Máximo DOS gráficos** (trend/ranking/share) por dashboard, el resto son de apoyo (kpi/context/table).
 
-**Orden de lectura en pantalla (fijo):** `context` → `kpi` → gráfico principal (ancho doble) → `table`.
+**Orden de lectura en pantalla (por prioridad, el server reordena igual):** `kpi` (la cifra principal es **hero**, ancho doble y resaltada) → gráficos (`ranking`/`trend`/`share`) → `table`/`structure` → `context` (strip compacto de una línea, datos adicionales) → `insights` (fila completa).
+
+## Layout (sin scroll, una pantalla)
+
+La grilla ancla a la altura de la ventana: las filas se estiran para llenar la pantalla y las cards se encogen; el scroll solo aparece si el contenido realmente no cabe (fallback móvil = scroll normal).
+
+**Filas de 12 columnas:** `kpi` = 3, la principal **6 (hero)** · `share` = 4 · `ranking`/`trend`/`table` = 6 (2 por fila) · `context`/`insights` = 12 (fila completa). El motor de layout expande cards para rellenar huecos (`dense`) — envía las cards por prioridad y cada fila cierra en 12.
 
 ## Recetas (intención → layout fijo)
 
@@ -52,6 +62,9 @@ Todas las cards aceptan `group` (opcional): cards con el mismo `group` se agrupa
 | Resumen de empresa | `kpi` total kWh + `ranking` + `table` |
 | Alertas | `kpi` conteo + `table` reciente |
 | Pregunta ambigua ("datos de energía") | Bloque principal: `kpi` P + `kpi` EPpos + `trend`; nunca mezclar kWh con kW en la misma card |
+| Estructural ("¿qué tableros tengo?") | `structure` (tableros → puntos) + `context` + `insights` |
+
+En **todas** las recetas, la card `insights` cierra el dashboard con el análisis del asistente.
 
 ## Formato de fechas
 

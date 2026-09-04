@@ -1,4 +1,5 @@
-import { runAgent } from "./agent";
+import { runAgent, freshSessionState, type AgentSessionState } from "./agent";
+import { runAnalysis, type AnalysisResult } from "./analyzer";
 import { env } from "./config";
 
 const MIME: Record<string, string> = {
@@ -31,12 +32,16 @@ interface ChatMessage {
 interface Session {
   messages: ChatMessage[];
   lastSeen: number;
+  state: AgentSessionState;
 }
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_SESSION_MESSAGES = 16;
 const MAX_SESSIONS = 200;
 const sessions = new Map<string, Session>();
+
+const ANALYSIS_TTL_MS = 10 * 60 * 1000;
+let analysisCache: { at: number; data: AnalysisResult } | null = null;
 
 function getSession(id: string): Session {
   const now = Date.now();
@@ -45,7 +50,7 @@ function getSession(id: string): Session {
   }
   let session = sessions.get(id);
   if (!session) {
-    session = { messages: [], lastSeen: now };
+    session = { messages: [], lastSeen: now, state: freshSessionState() };
     sessions.set(id, session);
   }
   session.lastSeen = now;
@@ -67,6 +72,19 @@ const server = Bun.serve({
     if (url.pathname === "/health" && req.method === "GET") {
       return Response.json({ ok: true, model: env.model });
     }
+
+    if (url.pathname === "/findings" && req.method === "GET") {
+      try {
+        const now = Date.now();
+        if (!analysisCache || now - analysisCache.at > ANALYSIS_TTL_MS) {
+          analysisCache = { at: now, data: await runAnalysis(env.defaultEnterpriseId) };
+        }
+        return Response.json(analysisCache.data);
+      } catch (err) {
+        return Response.json({ error: String(err) }, { status: 500 });
+      }
+    }
+
     if (url.pathname === "/chat" && req.method === "POST") {
       try {
         const body = (await req.json()) as {
@@ -94,7 +112,7 @@ const server = Bun.serve({
           ? session.messages.map((m) => ({ role: m.role, content: m.content }))
           : [];
         history.push({ role: "user", content: body.message });
-        const { reply, dashboard } = await runAgent(history, scope);
+        const { reply, dashboard } = await runAgent(history, scope, undefined, session?.state ?? freshSessionState());
         if (session) {
           session.messages = history
             .filter(
